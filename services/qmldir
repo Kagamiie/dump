@@ -1,2 +1,4 @@
 module Services
 singleton WeatherService 1.0 WeatherService.qml
+singleton AudioService   1.0 AudioService.qml
+GcalParser               1.0 GcalParser.qml

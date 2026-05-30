@@ -2,72 +2,20 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
 import "../../themes/"
+import "../../services/"
 
 ColumnLayout {
     required property Colors c
     required property Glyphs g
     spacing: 8
 
-    property int    volValue: 0
-    property bool   volMuted: false
-    property string volLabel: "Audio Device"
-    property int    micValue: 0
-    property bool   micMuted: false
-    property string micLabel: "Microphone"
-    property int brightValue: 50
-
-
-    Process {
-        command: ["pactl", "subscribe"]
-        running: true
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: line => {
-                if (line.includes("sink") || line.includes("server")) volProc.running = true
-                if (line.includes("source"))                          micProc.running = true
-            }
-        }
-    }
-
-    Component.onCompleted: { volProc.running = true; micProc.running = true }
-
-    Process {
-        id: volProc
-        command: ["sh", "-c",
-            "pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\\d+(?=%)' | head -1; " +
-            "pactl get-sink-mute @DEFAULT_SINK@; pactl get-default-sink"]
-        stdout: SplitParser {
-            splitMarker: "\n"
-            property int lineN: 0
-            onRead: line => {
-                if (!line.trim()) return
-                if (lineN === 0)      volValue = parseInt(line.trim())
-                else if (lineN === 1) volMuted  = line.includes("yes")
-                else if (lineN === 2) volLabel = line.includes("Speaker") ? "Speakers" : line.includes("Headphone") ? "Headphones" : "Audio Out"
-                lineN++
-            }
-        }
-        onRunningChanged: { if (running) stdout.lineN = 0 }
-    }
-
-    Process {
-        id: micProc
-        command: ["sh", "-c",
-            "pactl get-source-volume @DEFAULT_SOURCE@ | grep -oP '\\d+(?=%)' | head -1; " +
-            "pactl get-source-mute @DEFAULT_SOURCE@; pactl get-default-source"]
-        stdout: SplitParser {
-            splitMarker: "\n"
-            property int lineN: 0
-            onRead: line => {
-                if (!line.trim()) return
-                if (lineN === 0)      micValue = parseInt(line.trim())
-                else if (lineN === 1) micMuted  = line.includes("yes")
-                else if (lineN === 2) micLabel = line.includes("Mic") ? "Microphone" : line.includes("Camera") ? "Camera Mic" : "Audio In"
-                lineN++
-            }
-        }
-        onRunningChanged: { if (running) stdout.lineN = 0 }
-    }
+    property int    volValue:   AudioService.volume
+    property bool   volMuted:   AudioService.muted
+    property string volLabel:   AudioService.label
+    property int    micValue:   AudioService.micVol
+    property bool   micMuted:   AudioService.micMuted
+    property string micLabel:   AudioService.micLabel
+    property int    brightValue: 50
 
     Process {
         id: brightGetProc
@@ -79,8 +27,8 @@ ColumnLayout {
         }
     }
 
-    Process { id: setVolProc; property string cmd: ""; command: ["sh", "-c", cmd] }
-    Process { id: setMicProc; property string cmd: ""; command: ["sh", "-c", cmd] }
+    Process { id: setVolProc;   property string cmd: ""; command: ["sh", "-c", cmd] }
+    Process { id: setMicProc;   property string cmd: ""; command: ["sh", "-c", cmd] }
     Process { id: setBrightProc; property string cmd: ""; command: ["sh", "-c", cmd] }
 
     component SliderRow: Item {
@@ -183,14 +131,14 @@ ColumnLayout {
         c: parent.c; g: parent.g
         icon:    (volMuted || volValue === 0) ? g.audioMuted : volValue < 50 ? g.audioDecrease : g.audioIncrease
         label:   volLabel; value: volValue; isMuted: volMuted
-        onIconClicked: { setVolProc.cmd = "pactl set-sink-mute @DEFAULT_SINK@ toggle";        setVolProc.running = true }
+        onIconClicked: { setVolProc.cmd = "pactl set-sink-mute @DEFAULT_SINK@ toggle";         setVolProc.running = true }
         onMoved: val => { setVolProc.cmd = "pactl set-sink-volume @DEFAULT_SINK@ " + val + "%"; setVolProc.running = true }
     }
     SliderRow {
         c: parent.c; g: parent.g
         icon:    (micMuted || micValue === 0) ? g.micMuted : micValue < 50 ? g.micDecrease : g.micIncrease
         label:   micLabel; value: micValue; isMuted: micMuted
-        onIconClicked: { setMicProc.cmd = "pactl set-source-mute @DEFAULT_SOURCE@ toggle";        setMicProc.running = true }
+        onIconClicked: { setMicProc.cmd = "pactl set-source-mute @DEFAULT_SOURCE@ toggle";         setMicProc.running = true }
         onMoved: val => { setMicProc.cmd = "pactl set-source-volume @DEFAULT_SOURCE@ " + val + "%"; setMicProc.running = true }
     }
     SliderRow {

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import "../themes/"
+import "../services/"
 
 Item {
     required property Colors c
@@ -8,40 +9,13 @@ Item {
     implicitHeight: 24
     implicitWidth: box.implicitWidth
 
-    property int volume: 0
-    property bool muted: false
-    property int percent: 0
-    property string status: "Unknown"
+    property int    volume:  AudioService.volume
+    property bool   muted:   AudioService.muted
+    property int    percent: 0
+    property string status:  "Unknown"
 
     onVolumeChanged: volumeOsd.show(volume, muted)
     onMutedChanged:  volumeOsd.show(volume, muted)
-
-    Process {
-        command: ["pactl", "subscribe"]
-        running: true
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: line => {
-                if (line.includes("sink") || line.includes("server")) volProc.running = true
-            }
-        }
-    }
-
-    Process {
-        id: volProc
-        running: true
-        command: ["sh", "-c", "pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\\d+(?=%)' | head -1; pactl get-sink-mute @DEFAULT_SINK@"]
-        stdout: SplitParser {
-            splitMarker: "\n"
-            property bool first: true
-            onRead: line => {
-                if (!line.trim()) return
-                if (first) { volume = parseInt(line.trim()) || 0 }
-                else       { muted = line.includes("yes") }
-                first = !first
-            }
-        }
-    }
 
     Timer {
         interval: 30000; repeat: true; running: true; triggeredOnStart: true

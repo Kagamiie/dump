@@ -51,7 +51,6 @@ PanelWindow {
             UserCard { Layout.fillWidth: true; c: root.c; g: root.g }
             Rectangle { Layout.fillWidth: true; height: 1; color: c.bg3 }
 
-            // Tab bar
             Rectangle {
                 Layout.fillWidth: true
                 height: 32
@@ -81,27 +80,20 @@ PanelWindow {
                                 height: 2
                                 color: root.activeTab === index ? c.accent : "transparent"
                             }
-
-                            // LEFT border (Overview only)
                             Rectangle {
                                 visible: index === 0
                                 anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                                width: 1
-                                color: c.bg3
+                                width: 1; color: c.bg3
                             }
-
-                            // RIGHT border (Schedule only)
                             Rectangle {
                                 visible: index === tabsRepeater.count - 1
                                 anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
-                                width: 1
-                                color: c.bg3
+                                width: 1; color: c.bg3
                             }
 
                             Row {
                                 anchors.centerIn: parent
                                 spacing: 6
-
                                 Text {
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.icon
@@ -128,32 +120,23 @@ PanelWindow {
                 }
             }
 
+            // DND row — les Rectangle orphelins référençant `index` hors Repeater sont supprimés
             Rectangle {
                 Layout.fillWidth: true
                 height: 32
                 color: c.bg1
 
-                // LEFT border (Overview only)
-                Rectangle {
-                    visible: index === 0
-                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                    width: 1
-                    color: c.bg3
-                }
-
-                // RIGHT border (Schedule only)
-                Rectangle {
-                    visible: index === tabsRepeater.count - 1
-                    anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
-                    width: 1
-                    color: c.bg3
-                }
-
-                // TOP border (all tabs)
                 Rectangle {
                     anchors { left: parent.left; right: parent.right; top: parent.top }
-                    height: 1
-                    color: c.bg3
+                    height: 1; color: c.bg3
+                }
+                Rectangle {
+                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                    width: 1; color: c.bg3
+                }
+                Rectangle {
+                    anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
+                    width: 1; color: c.bg3
                 }
 
                 RowLayout {
@@ -173,13 +156,13 @@ PanelWindow {
                     }
                     Rectangle {
                         id: dndTrack
-                        width: 32; height: 18; radius: 0
+                        width: 32; height: 18
                         color: dndThumb.x > 4 ? c.accent : c.bg3
                         Behavior on color { ColorAnimation { duration: 150 } }
 
                         Rectangle {
                             id: dndThumb
-                            width: 14; height: 14; radius: 0
+                            width: 14; height: 14
                             anchors.verticalCenter: parent.verticalCenter
                             x: shellRoot.dnd ? 16 : 2
                             color: c.fg3
@@ -197,7 +180,6 @@ PanelWindow {
 
             Rectangle { Layout.fillWidth: true; height: 1; color: c.bg3 }
 
-            // Tab content
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.margins: 16

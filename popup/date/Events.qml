@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
 import "../../themes/"
+import "../../services/"
 
 Item {
     required property Colors c
@@ -23,6 +24,8 @@ Item {
                d.getDate().toString().padStart(2, "0")
     }
 
+    GcalParser { id: parser }
+
     Timer {
         interval: 60000; repeat: true; running: true; triggeredOnStart: true
         onTriggered: { fetchProc.running = false; Qt.callLater(() => fetchProc.running = true) }
@@ -31,27 +34,13 @@ Item {
     Process {
         id: fetchProc
         command: ["sh", "-c", "gcalcli --nocolor agenda " + todayStr + " " + tomorrowStr + " --details all --tsv 2>/dev/null"]
-
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
-                if (!line.trim()) return
-                const parts = line.split("\t")
-                if (parts.length < 10 || parts[2].trim() === "start_time") return
-
-                const start      = parts[2].trim()
-                const end        = parts[4].trim()
-                const rawTitle   = parts[9].trim().split(";")[0].trim()
-                const dashIdx    = rawTitle.indexOf(" - ")
-                const courseCode = dashIdx !== -1 ? rawTitle.substring(0, dashIdx).trim() : rawTitle
-                const courseName = dashIdx !== -1 ? rawTitle.substring(dashIdx + 3).trim() : ""
-                const salle      = parts.length > 10 ? parts[10].trim().split(" - ")[0].trim() : ""
-                const prof       = parts.length > 11 ? parts[11].trim().split(";")[0].trim()   : ""
-
-                buffer.push({ start, end, courseCode, courseName, prof, salle })
+                const event = parser.parseLine(line)
+                if (event) buffer.push(event)
             }
         }
-
         onRunningChanged: { if (running) buffer = [] }
         onExited: { events = buffer.slice() }
     }

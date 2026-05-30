@@ -18,14 +18,14 @@ QtObject {
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
-                if (line.includes("sink") || line.includes("server")) volProc.running = true
-                if (line.includes("source"))                          micProc.running = true
+                if (line.includes("sink") || line.includes("server")) sinkProc.running = true
+                if (line.includes("source"))                          sourceProc.running = true
             }
         }
     }
 
-    property var volProc: Process {
-        id: volProc
+    property var sinkProc: Process {
+        id: sinkProc
         running: true
         command: ["sh", "-c",
             "pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\\d+(?=%)' | head -1; " +
@@ -45,8 +45,8 @@ QtObject {
         onRunningChanged: { if (running) stdout.lineN = 0 }
     }
 
-    property var micProc: Process {
-        id: micProc
+    property var sourceProc: Process {
+        id: sourceProc
         command: ["sh", "-c",
             "pactl get-source-volume @DEFAULT_SOURCE@ | grep -oP '\\d+(?=%)' | head -1; " +
             "pactl get-source-mute @DEFAULT_SOURCE@; pactl get-default-source"]
@@ -55,9 +55,10 @@ QtObject {
             property int lineN: 0
             onRead: line => {
                 if (!line.trim()) return
-                if (lineN === 0)      micValue = parseInt(line.trim())
-                else if (lineN === 1) micMuted  = line.includes("yes")
-                else if (lineN === 2) micLabel = line.includes("Mic") ? "Microphone" : line.includes("Camera") ? "Camera Mic" : "Audio In"
+                if (lineN === 0)      root.micVol   = parseInt(line.trim()) || 0
+                else if (lineN === 1) root.micMuted  = line.includes("yes")
+                else if (lineN === 2) root.micLabel  = line.includes("Mic")    ? "Microphone"
+                                                     : line.includes("Camera") ? "Camera Mic" : "Audio In"
                 lineN++
             }
         }
