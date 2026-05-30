@@ -35,7 +35,13 @@ ColumnLayout {
     Process {
         id: setWallProc
         property string path: ""
-        command: ["bash", "-c", "swaybg -i \"" + path + "\" -m fill & sleep 0.3 && pkill -o swaybg"]
+        command: ["bash", "-c",
+            "OLD=$(cat /tmp/qs_swaybg.pid 2>/dev/null); " +
+            "swaybg -i \"" + path + "\" -m fill & " +
+            "echo $! > /tmp/qs_swaybg.pid; " +
+            "[ -n \"$OLD\" ] && kill \"$OLD\" 2>/dev/null; " +
+            "true"
+        ]
     }
 
     RowLayout {

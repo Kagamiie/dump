@@ -34,8 +34,9 @@ PanelWindow {
             nixResults = []
             nixStatus = ""
             nixSelected = 0
-            logic.updateFilter()  // add this
-            Qt.callLater(() => searchInput.forceActiveFocus())  // move focus here
+            searchBar.clear()          // ← ajouter ça
+            logic.updateFilter()
+            Qt.callLater(() => searchBar.searchInput.forceActiveFocus())
         }
     }
 
@@ -48,9 +49,9 @@ PanelWindow {
         nixResults = []
         nixStatus = ""
         nixSelected = 0
-        searchInput.text = ""
+        searchBar.searchInput.text = ""
         logic.updateFilter()  // add this
-        Qt.callLater(() => searchInput.forceActiveFocus())
+        Qt.callLater(() => searchBar.searchInput.forceActiveFocus())
     }
 
     // Apps state

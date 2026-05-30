@@ -58,8 +58,25 @@ Column {
         onExited: { btListProc.running = true }
     }
 
-    Timer { interval: 5000;  repeat: true; running: true; triggeredOnStart: true
+    Timer { interval: 20000; repeat: true; running: true; triggeredOnStart: true
             onTriggered: { netProc.running = true; ssidProc.running = true } }
+
+    // Ajouter juste après ce Timer :
+    Process {
+        command: ["nmcli", "monitor"]
+        running: true
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: line => {
+                if (!line.trim()) return
+                netProc.running  = true
+                ssidProc.running = true
+                if (line.includes("wifi") || line.includes("wireless"))
+                    wifiListProc.running = true
+            }
+        }
+    }
+
     Timer { interval: 10000; repeat: true; running: true; triggeredOnStart: true
             onTriggered: btListProc.running = true }
 
@@ -219,12 +236,19 @@ Column {
     }
 
     Process {
-        id: btScanProc
+        id: btScanStartProc
+        command: ["bash", "-c", "bluetoothctl scan on >/dev/null 2>&1 &"]
+        onExited: btScanTimer.start()
+    }
+
+    Process {
+        id: btScanStopProc
+        command: ["bash", "-c", "bluetoothctl scan off >/dev/null 2>&1"]
+    }
+
+    Process {
+        id: btScanPollProc
         command: ["bash", "-c", `
-            bluetoothctl scan on &
-            SCAN_PID=$!
-            sleep 8
-            kill $SCAN_PID 2>/dev/null
             bluetoothctl devices Paired 2>/dev/null | awk '{print $2}' > /tmp/qs_paired_macs
             bluetoothctl devices 2>/dev/null | while read _ mac rest; do
                 info=$(bluetoothctl info "$mac" 2>/dev/null)
@@ -245,19 +269,24 @@ Column {
                 if (parts.length !== 4) return
                 const mac = parts[0].trim()
                 if (buf.some(d => d.mac === mac)) return
-                buf.push({ mac, name: parts[1].trim(), connected: parts[2].trim() === "1", paired: parts[3].trim() === "1" })
+                buf.push({ mac, name: parts[1].trim(), connected: parts[2] === "1", paired: parts[3] === "1" })
             }
         }
-        onRunningChanged: {
-            if (running) {
-                btScanning = true
-                stdout.buf = []
-            } else {
-                btScanning = false
-                btScanList = stdout.buf.slice()
-            }
+        onRunningChanged: { if (running) stdout.buf = [] }
+        onExited: {
+            btScanning = false
+            btScanList = stdout.buf.slice()
+            btScanStopProc.running = true
         }
     }
+
+    Timer {
+        id: btScanTimer
+        interval: 8000
+        repeat: false
+        onTriggered: btScanPollProc.running = true
+    }
+
 
     PassInput {
         id: passInput
@@ -410,6 +439,10 @@ Column {
         onDisconnectDevice: mac => { btDisconnectProc.mac = mac; btDisconnectProc.running = true }
         onUnpair:           mac => { btUnpairProc.mac     = mac; btUnpairProc.running     = true }
         onPair:             mac => { btPairProc.mac        = mac; btPairProc.running        = true }
-        onScan: btScanProc.running = true
+        onScan: {
+            btScanning = true
+            btScanList = []
+            btScanStartProc.running = true
+        }
     }
 }

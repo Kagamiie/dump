@@ -61,7 +61,7 @@ ShellRoot {
                 screen: win.screen
                 c: root.c
                 g: root.g
-                appLauncher: launcher
+                appLauncher: launcherroot
             }
         }
     }

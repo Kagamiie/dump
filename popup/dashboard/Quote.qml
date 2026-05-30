@@ -9,7 +9,10 @@ Text {
     wrapMode: Text.WordWrap
     font { pixelSize: 10; family: "JetBrains Mono Nerd Font"; italic: true }
     color: c.fg2
-    text: "\"" + [
+
+    property int _idx: Math.floor(Math.random() * 10)
+
+    readonly property var _quotes: [
         "This is the world of the recycled vessel, created to avoid the destruction of all.",
         "The Black Scrawl. A lost destiny. A white book. A false truth.",
         "The dragon's corpse brought death to the world.",
@@ -20,5 +23,14 @@ Text {
         "Do not bring back the light. Do not bring back the vessel.",
         "The song of man has been drowned out.",
         "The puppet priest collects the accursed prayers."
-    ][Math.floor(Date.now() / 60000) % 10] + "\""
+    ]
+
+    Timer {
+        interval: 300000
+        repeat: true
+        running: true
+        onTriggered: parent._idx = (parent._idx + 1) % parent._quotes.length
+    }
+
+    text: "\"" + _quotes[_idx] + "\""
 }

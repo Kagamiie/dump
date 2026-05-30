@@ -10,6 +10,8 @@ Rectangle {
 
     property alias searchInput: searchInput
 
+    function clear() { searchInput.text = "" }
+
     RowLayout {
         anchors { fill: parent; leftMargin: 18; rightMargin: 18 }
         spacing: 12
