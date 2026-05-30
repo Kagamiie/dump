@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../themes/"
+import "../services/"
 
 Item {
     id: clockRoot
@@ -10,32 +11,12 @@ Item {
     implicitHeight: parent.height
     implicitWidth: row.implicitWidth
 
-    property bool hoveredDateTime: false
-    property bool hoveredWeather: false
-    property string weatherIcon: ""
-    property string weatherTemp: ""
+    property bool   hoveredDateTime: false
+    property bool   hoveredWeather:  false
+    property string weatherIcon:     WeatherService.icon
+    property string weatherTemp:     WeatherService.tempC
 
     SystemClock { id: clk; precision: SystemClock.Seconds }
-
-    Timer {
-        interval: 7200000; repeat: true; running: true; triggeredOnStart: true
-        onTriggered: weatherProc.running = true
-    }
-
-    Process {
-        id: weatherProc
-        command: ["curl", "-s", "-A", "Mozilla/5.0", "https://wttr.in/?format=j1"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const cur = JSON.parse(this.text).current_condition[0]
-                    const h = new Date().getHours()
-                    weatherIcon = g.weatherGlyph(cur.weatherCode, h >= 6 && h < 21)
-                    weatherTemp = cur.temp_C + "°C"
-                } catch(_) {}
-            }
-        }
-    }
 
     MouseArea {
         anchors.fill: parent

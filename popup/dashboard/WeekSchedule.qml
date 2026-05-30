@@ -295,3 +295,51 @@ ColumnLayout {
         }
     }
 }
+
+
+// 3. Parsing gcalcli dupliqué — WeekSchedule.qml + Events.qml
+// Pourquoi : La fonction de parsing TSV est copiée-collée mot pour mot. Les indices parts[9], parts[10], parts[11], le split(";")[0], le indexOf(" - ") — identiques dans les deux fichiers. Si le format change ou si t'as un bug, tu corriges deux fois et t'oublies l'un des deux.
+// Comment : Une fonction utilitaire. Ça peut vivre dans un GcalUtils.qml ou directement inliné proprement dans un service.
+// qml// services/GcalParser.qml  (pas un singleton, juste un QtObject réutilisable)
+// import QtQuick
+
+// QtObject {
+//     // retourne null si la ligne est invalide
+//     function parseLine(line) {
+//         if (!line.trim()) return null
+//         const parts = line.split("\t")
+//         if (parts.length < 10 || parts[2].trim() === "start_time") return null
+
+//         const rawTitle   = parts[9].trim().split(";")[0].trim()
+//         const dashIdx    = rawTitle.indexOf(" - ")
+//         const courseCode = dashIdx !== -1 ? rawTitle.substring(0, dashIdx).trim() : rawTitle
+//         const courseName = dashIdx !== -1 ? rawTitle.substring(dashIdx + 3).trim() : ""
+
+//         return {
+//             date:       parts[1].trim(),
+//             start:      parts[2].trim(),
+//             end:        parts[4].trim(),
+//             courseCode,
+//             courseName,
+//             salle: parts.length > 10 ? parts[10].trim().split(" - ")[0].trim() : "",
+//             prof:  parts.length > 11 ? parts[11].trim().split(";")[0].trim()   : ""
+//         }
+//     }
+// }
+// Ensuite dans les deux fichiers :
+// qml// avant (dans les deux fichiers)
+// onRead: line => {
+//     if (!line.trim()) return
+//     const parts = line.split("\t")
+//     if (parts.length < 10 || parts[2].trim() === "start_time") return
+//     const rawTitle = parts[9].trim().split(";")[0].trim()
+//     // ... 10 lignes identiques
+// }
+
+// // après
+// GcalParser { id: parser }
+
+// onRead: line => {
+//     const event = parser.parseLine(line)
+//     if (event) buffer.push(event)
+// }

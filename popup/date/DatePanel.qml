@@ -38,18 +38,12 @@ PanelWindow {
     Rectangle {
         x: offsetX
         y: offsetY
-
         width: 300
         height: mainCol.implicitHeight + 32
-
         color: c.bg0
-        border.width: 1
-        border.color: c.bg3
+        border { width: 1; color: c.bg3 }
 
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {}
-        }
+        MouseArea { anchors.fill: parent; onClicked: {} }
 
         ColumnLayout {
             id: mainCol
@@ -60,10 +54,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 spacing: 4
 
-                SystemClock {
-                    id: clk
-                    precision: SystemClock.Seconds
-                }
+                SystemClock { id: clk; precision: SystemClock.Seconds }
 
                 Text {
                     Layout.fillWidth: true
@@ -101,10 +92,7 @@ PanelWindow {
 
             Calendar { Layout.fillWidth: true; c: root.c }
 
-            Weather { Layout.fillWidth: true; c: root.c; g: root.g }
-
-            // Rectangle { Layout.fillWidth: true; height: 1; color: c.bg3 }
-            // Events { Layout.fillWidth: true; c: root.c }
+            Weather   { Layout.fillWidth: true; c: root.c; g: root.g }
         }
     }
 }

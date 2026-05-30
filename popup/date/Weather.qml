@@ -2,45 +2,29 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
 import "../../themes/"
+import "../../services/"
 
 Item {
     required property Colors c
     required property Glyphs g
     implicitHeight: weatherData === null ? loadingText.implicitHeight : card.implicitHeight
 
-    property var weatherData: null
-    property bool showHourly: true
+    property var weatherData: WeatherService.data
 
-    property string tempC:       weatherData ? weatherData.current_condition[0].temp_C            : ""
-    property string feelsLike:   weatherData ? weatherData.current_condition[0].FeelsLikeC        : ""
-    property string humidity:    weatherData ? weatherData.current_condition[0].humidity           : ""
-    property string windspeed:   weatherData ? weatherData.current_condition[0].windspeedKmph      : ""
-    property string description: weatherData ? weatherData.current_condition[0].weatherDesc[0].value.trim() : ""
-    property string weatherCode: weatherData ? weatherData.current_condition[0].weatherCode        : "113"
-    property string maxTemp:     weatherData ? weatherData.weather[0].maxtempC                     : ""
-    property string minTemp:     weatherData ? weatherData.weather[0].mintempC                     : ""
-    property var hourly:         weatherData ? weatherData.weather[0].hourly.slice(0, 7)           : []
-    property var nextDays:       weatherData ? weatherData.weather.slice(1, 3)                     : []
+    property string tempC:       weatherData ? weatherData.current_condition[0].temp_C                    : ""
+    property string feelsLike:   weatherData ? weatherData.current_condition[0].FeelsLikeC                : ""
+    property string humidity:    weatherData ? weatherData.current_condition[0].humidity                   : ""
+    property string windspeed:   weatherData ? weatherData.current_condition[0].windspeedKmph              : ""
+    property string description: weatherData ? weatherData.current_condition[0].weatherDesc[0].value.trim(): ""
+    property string weatherCode: weatherData ? weatherData.current_condition[0].weatherCode                : "113"
+    property string maxTemp:     weatherData ? weatherData.weather[0].maxtempC                             : ""
+    property string minTemp:     weatherData ? weatherData.weather[0].mintempC                             : ""
+    property var    hourly:      weatherData ? weatherData.weather[0].hourly.slice(0, 7)                   : []
+    property var    nextDays:    weatherData ? weatherData.weather.slice(1, 3)                             : []
+    property bool   showHourly:  true
 
     function weatherIcon(code, hour) {
         return g.weatherGlyph(code, parseInt(hour) / 100 >= 6 && parseInt(hour) / 100 < 21)
-    }
-
-    Timer {
-        interval: 7200000; repeat: true; running: true; triggeredOnStart: true
-        onTriggered: fetchProc.running = true
-    }
-
-    Process {
-        id: fetchProc
-        command: ["curl", "-s", "-A", "Mozilla/5.0", "https://wttr.in/?format=j1"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try { weatherData = JSON.parse(this.text) }
-                catch (e) { console.log("weather error:", e) }
-            }
-        }
-        onRunningChanged: { if (running) weatherData = null }
     }
 
     Text {
@@ -76,13 +60,9 @@ Item {
 
                 Text {
                     anchors {
-                        left: parent.left
-                        top: parent.top
-                        bottom: parent.bottom
-                        leftMargin: 20
-                        topMargin: 20
+                        left: parent.left; top: parent.top; bottom: parent.bottom
+                        leftMargin: 20; topMargin: 20
                     }
-
                     text: g.weatherGlyph(weatherCode, new Date().getHours() >= 6 && new Date().getHours() < 21)
                     font.family: gwnce.name
                     font.pixelSize: 150
@@ -92,14 +72,9 @@ Item {
 
                 RowLayout {
                     anchors {
-                        left: parent.left
-                        right: parent.right
-                        top: parent.top
-                        leftMargin: 12
-                        rightMargin: 12
-                        topMargin: 12
+                        left: parent.left; right: parent.right; top: parent.top
+                        leftMargin: 12; rightMargin: 12; topMargin: 12
                     }
-
                     z: 1
                     spacing: 8
 
@@ -110,12 +85,10 @@ Item {
 
                         Text {
                             text: description
-
                             font.pixelSize: 14
                             font.bold: true
                             font.family: "JetBrains Mono Nerd Font"
                             color: c.fg0
-
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
@@ -123,7 +96,6 @@ Item {
 
                         Text {
                             text: "Humidity: " + humidity + "%"
-
                             font.pixelSize: 10
                             font.family: "JetBrains Mono Nerd Font"
                             color: c.fg2
@@ -135,22 +107,18 @@ Item {
 
                         Text {
                             text: tempC + "°C"
-
                             font.pixelSize: 20
                             font.bold: true
                             font.family: "JetBrains Mono Nerd Font"
                             color: c.fg0
-
                             Layout.alignment: Qt.AlignRight
                         }
 
                         Text {
                             text: feelsLike + "°C"
-
                             font.pixelSize: 10
                             font.family: "JetBrains Mono Nerd Font"
                             color: c.fg2
-
                             Layout.alignment: Qt.AlignRight
                         }
                     }
@@ -174,8 +142,7 @@ Item {
                         width: 56; height: 18
                         color: modelData.active ? c.bg3 : "transparent"
                         radius: 2
-                        border.width: 1
-                        border.color: c.bg3
+                        border { width: 1; color: c.bg3 }
                         Text {
                             anchors.centerIn: parent
                             text: modelData.label
@@ -283,8 +250,8 @@ Item {
                                 Repeater {
                                     model: [
                                         { label: "T:", value: modelData.maxtempC + "/" + modelData.mintempC + "°C", color: c.red },
-                                        { label: "H:", value: modelData.hourly[4].humidity + "%",      color: c.accent },
-                                        { label: "R:", value: modelData.hourly[4].chanceofrain + "%",  color: c.bccent }
+                                        { label: "H:", value: modelData.hourly[4].humidity + "%",     color: c.accent },
+                                        { label: "R:", value: modelData.hourly[4].chanceofrain + "%", color: c.bccent }
                                     ]
                                     delegate: RowLayout {
                                         required property var modelData
