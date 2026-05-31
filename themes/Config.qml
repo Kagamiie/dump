@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import Quickshell
 
 QtObject {
     readonly property string wallpapersDir: Quickshell.env("HOME") + "/Documents/Medias/Wallpapers"

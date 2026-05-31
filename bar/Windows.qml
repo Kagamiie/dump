@@ -5,32 +5,32 @@ import "../themes/"
 Item {
     required property Colors c
     required property var ipc
-
-    implicitHeight: parent?.height ?? 36
+    implicitHeight: parent ?. height ?? 36
 
     RowLayout {
         anchors {
-            left: parent.left
-            right: parent.right
-            verticalCenter: parent.verticalCenter
+            left : parent.left
+            right : parent.right
+            verticalCenter : parent.verticalCenter
         }
-        height: 24
-        spacing: 6
+
+        height : 24
+        spacing : 6
 
         Repeater {
-            model: ipc.windows
+            model : ipc.windows
             delegate: Rectangle {
                 required property var modelData
-                height: 24
 
                 Layout.fillWidth: true
-                Layout.maximumWidth: 200
+                Layout.minimumWidth: 0
+
+                height: 24
                 color: modelData.focused ? c.bg2 : c.bg1
                 border.width: 1
                 border.color: c.bg3
 
                 Text {
-                    id: lbl
                     anchors {
                         verticalCenter: parent.verticalCenter
                         left: parent.left
