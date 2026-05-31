@@ -17,7 +17,8 @@ ColumnLayout {
     property real tooltipX:     0
     property real tooltipY:     0
 
-    property bool gcalError: false
+    property bool gcalError:   false
+    property bool _fetchBusy:  false
 
     GcalParser { id: parser }
 
@@ -84,10 +85,13 @@ ColumnLayout {
     }
 
     function _triggerFetch() {
+        // FIX : ne jamais tuer un fetchProc en cours (= SIGTERM = code 15)
+        // Si occupé, ignorer — le timer de 5min reessaiera
+        if (fetchProc.running) return
+
         fetchProc.startDate = _fmtDate(monday())
         fetchProc.endDate   = _fmtDate(sunday())
-        fetchProc.running   = false
-        Qt.callLater(() => fetchProc.running = true)
+        fetchProc.running   = true
     }
 
     Timer {
@@ -116,14 +120,16 @@ ColumnLayout {
         onRunningChanged: { if (running) buffer = [] }
 
         onExited: code => {
+            // code 1 = gcalcli erreur (auth, réseau, etc.)
+            // code 15 = SIGTERM — ne devrait plus arriver avec le guard ci-dessus
             if (code !== 0) {
                 gcalError = true
-                console.warn("WeekSchedule: gcalcli exited with code", code)
+                console.warn("WeekSchedule: gcalcli exited with code", code,
+                             "startDate:", startDate, "endDate:", endDate)
                 return
             }
             gcalError = false
             const evts = buffer.slice()
-
             events  = evts
             grouped = _groupByDay(evts)
         }

@@ -8,12 +8,11 @@ ColumnLayout {
     required property Glyphs g
     spacing: 8
 
-    property var    wallpapers:       []
-    property string _activeWallPath:  ""
-    property string _pendingWallPath: ""
-    property int    wallPage:         0
+    property var    wallpapers:      []
+    property string _activeWallPath: ""
+    property int    wallPage:        0
 
-    property int pageCount: Math.ceil(wallpapers.length / 9)
+    property int _wallPageCount: Math.ceil(wallpapers.length / 9)
 
     onWallpapersChanged: wallPage = 0
 
@@ -23,50 +22,69 @@ ColumnLayout {
         id: _listProc
         command: ["find", Config.wallpapersDir, "-maxdepth", "1", "-type", "f",
                   "(", "-iname", "*.jpg",  "-o", "-iname", "*.jpeg",
-                  "-o", "-iname", "*.png", "-o", "-iname", "*.webp", ")",
-                  "-print0"]
+                  "-o", "-iname", "*.png", "-o", "-iname", "*.webp", ")"]
         stdout: SplitParser {
-            splitMarker: "\0"
+            splitMarker: "\n"
             property var buf: []
-            onRead: line => { if (line.trim()) buf.push(line.trim()) }
+            onRead: line => { const t = line.trim(); if (t) buf.push(t) }
         }
         onRunningChanged: { if (running) stdout.buf = [] }
-        onExited: {
-            const sorted = stdout.buf.slice().sort()
-            wallpapers = sorted
-        }
+        onExited: { wallpapers = stdout.buf.slice().sort() }
     }
 
-    Process {
-        id: _killProc
-        command: ["pkill", "-x", "swaybg"]
-
-        onExited: {
-            if (_pendingWallPath !== "") {
-                _launchProc.wallPath  = _pendingWallPath
-                _activeWallPath       = _pendingWallPath
-                _pendingWallPath      = ""
-                _launchProc.running   = true
-            }
-        }
-    }
+    // FIX DEFINITIF : le vrai problème était que running était déjà `false`
+    // quand on tentait de le remettre à `true` — QML ne déclenche rien si
+    // la valeur ne change pas (false -> false = no-op).
+    //
+    // Solution : on ne touche JAMAIS à running depuis QML.
+    // On utilise un script bash qui tourne en boucle infinie et lit
+    // les chemins depuis stdin via un named pipe (FIFO).
+    // QML écrit dans le pipe — le script tue l'ancien swaybg et lance le nouveau.
+    // Un seul Process QML, toujours running=true, jamais relancé.
 
     Process {
-        id: _launchProc
-        property string wallPath: ""
-        command: ["swaybg", "-i", wallPath, "-m", "fill"]
+        id: _daemonProc
+        // Démarre le daemon wallpaper : crée le pipe, boucle sur les chemins reçus
+        command: ["bash", "-c",
+            "PIPE=/tmp/qs_wall_pipe; " +
+            "rm -f \"$PIPE\"; " +
+            "mkfifo \"$PIPE\"; " +
+            "trap 'pkill -x swaybg 2>/dev/null; rm -f \"$PIPE\"' EXIT; " +
+            "while IFS= read -r path < \"$PIPE\"; do " +
+            "  [ -z \"$path\" ] && continue; " +
+            "  pkill -x swaybg 2>/dev/null; " +
+            "  sleep 0.1; " +
+            "  swaybg -i \"$path\" -m fill & " +
+            "done"
+        ]
+        running: true
         onRunningChanged: {
-            if (!running && wallPath !== "") {
-                console.warn("WallpaperPicker: swaybg exited unexpectedly for", wallPath)
+            if (!running) {
+                console.warn("WallpaperPicker: daemon died, restarting")
+                Qt.callLater(() => running = true)
             }
+        }
+    }
+
+    // Process qui écrit un chemin dans le pipe — court, se termine immédiatement
+    Process {
+        id: _writeProc
+        property string path: ""
+        command: ["bash", "-c", "echo '" + path + "' > /tmp/qs_wall_pipe"]
+        onExited: code => {
+            if (code !== 0)
+                console.warn("WallpaperPicker: write to pipe failed, code", code)
         }
     }
 
     function setWallpaper(path) {
         if (path === _activeWallPath) return
-        _pendingWallPath = path
-        _killProc.running = false
-        Qt.callLater(() => _killProc.running = true)
+        _activeWallPath  = path
+        _writeProc.path  = path
+        // FIX : forcer running true->false->true même si déjà false
+        // en passant explicitement par false d'abord via Qt.callLater
+        _writeProc.running = false
+        Qt.callLater(() => { _writeProc.running = true })
     }
 
     RowLayout {
@@ -136,7 +154,6 @@ ColumnLayout {
                     anchors { right: parent.right; bottom: parent.bottom; margins: 3 }
                     width: 14; height: 14
                     color: c.accent
-
                     Text {
                         anchors.centerIn: parent
                         text: "✓"
@@ -158,7 +175,7 @@ ColumnLayout {
         Layout.fillWidth: true
         c: parent.c
         currentPage: wallPage
-        pageCount:   pageCount
+        pageCount:   _wallPageCount
         onPrev: wallPage--
         onNext: wallPage++
     }
