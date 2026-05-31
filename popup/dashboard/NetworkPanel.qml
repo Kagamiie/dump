@@ -14,8 +14,6 @@ Column {
     property bool   showBtList:    false
     property bool   showPassInput: false
     property string pendingSsid:   ""
-
-    // Raccourcis vers les services
     property var net: NetworkService
     property var bt:  BluetoothService
 
@@ -24,7 +22,6 @@ Column {
         NetworkService.refreshSaved()
     }
 
-    // Réagir aux échecs de connexion
     Connections {
         target: NetworkService
         function onConnectionFailed(ssid) {

@@ -10,7 +10,7 @@ Rectangle {
     property var  btList:     []
     property var  btScanList: []
     property bool btScanning: false
-    property var newDevices: []
+    property var  newDevices: []
 
     signal pair(string mac)
     signal unpair(string mac)
@@ -18,9 +18,9 @@ Rectangle {
     signal disconnectDevice(string mac)
     signal scan()
 
-    property int pageSize:      8
-    property int pairedPage:    0
-    property int scanPage:      0
+    property int pageSize:   8
+    property int pairedPage: 0
+    property int scanPage:   0
 
     property var pagedPaired: {
         const start = pairedPage * pageSize
@@ -31,13 +31,13 @@ Rectangle {
         return newDevices.slice(start, start + pageSize)
     }
 
-    property int pairedPageCount: Math.ceil(btList.length / pageSize)
+    property int pairedPageCount: Math.ceil(btList.length   / pageSize)
     property int scanPageCount:   Math.ceil(newDevices.length / pageSize)
 
-    onBtScanListChanged: updateNewDevices()
-    onBtListChanged:     updateNewDevices()
+    onBtScanListChanged: _updateNewDevices()
+    onBtListChanged:     _updateNewDevices()
 
-    function updateNewDevices() {
+    function _updateNewDevices() {
         newDevices = btScanList.filter(d => !btList.some(b => b.mac === d.mac) && !d.paired)
         scanPage = 0
     }
@@ -51,10 +51,11 @@ Rectangle {
         id: btListCol
         width: parent.width
 
+        // Header
         Rectangle {
-            width: parent.width
-            height: 28
+            width: parent.width; height: 28
             color: c.bg2
+            border { width: 0 }
 
             Rectangle {
                 anchors { top: parent.top; left: parent.left; right: parent.right }
@@ -93,8 +94,7 @@ Rectangle {
 
         Text {
             visible: root.btList.length === 0
-            width: parent.width
-            height: 32
+            width: parent.width; height: 32
             text: "No paired devices"
             font { pixelSize: 11; family: "JetBrains Mono Nerd Font" }
             color: c.fg2
@@ -110,8 +110,7 @@ Rectangle {
 
                 property bool rowHovered: false
 
-                width: parent.width
-                height: 32
+                width: parent.width; height: 32
                 color: rowHovered ? c.bg2 : "transparent"
 
                 Rectangle { width: 1; height: parent.height; color: c.bg3; anchors.left: parent.left }
@@ -126,7 +125,6 @@ Rectangle {
                 }
 
                 MouseArea {
-                    id: delegateMa
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -185,76 +183,19 @@ Rectangle {
             }
         }
 
-        Rectangle {
-            visible: root.pairedPageCount > 1
+        Paginator {
             width: parent.width
-            height: 28
-            color: c.bg2
-
-            RowLayout {
-                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-
-                Text {
-                    text: (root.pairedPage + 1) + " / " + root.pairedPageCount
-                    font { pixelSize: 10; family: "JetBrains Mono Nerd Font" }
-                    color: c.fg2
-                    Layout.fillWidth: true
-                }
-
-                Row {
-                    spacing: 4
-
-                    Rectangle {
-                        width: 22; height: 18
-                        color: prevPairedMa.containsMouse ? c.bg3 : "transparent"
-                        border { width: 1; color: root.pairedPage > 0 ? c.bg3 : "transparent" }
-                        opacity: root.pairedPage > 0 ? 1 : 0.3
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "‹"
-                            font { pixelSize: 13; family: "JetBrains Mono Nerd Font" }
-                            color: c.fg2
-                        }
-
-                        MouseArea {
-                            id: prevPairedMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { if (root.pairedPage > 0) root.pairedPage-- }
-                        }
-                    }
-
-                    Rectangle {
-                        width: 22; height: 18
-                        color: nextPairedMa.containsMouse ? c.bg3 : "transparent"
-                        border { width: 1; color: root.pairedPage < root.pairedPageCount - 1 ? c.bg3 : "transparent" }
-                        opacity: root.pairedPage < root.pairedPageCount - 1 ? 1 : 0.3
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "›"
-                            font { pixelSize: 13; family: "JetBrains Mono Nerd Font" }
-                            color: c.fg2
-                        }
-
-                        MouseArea {
-                            id: nextPairedMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { if (root.pairedPage < root.pairedPageCount - 1) root.pairedPage++ }
-                        }
-                    }
-                }
-            }
+            c: root.c
+            currentPage: root.pairedPage
+            pageCount:   root.pairedPageCount
+            onPrev: root.pairedPage--
+            onNext: root.pairedPage++
         }
 
+        // Section new device
         Rectangle {
             visible: root.newDevices.length > 0
-            width: parent.width
-            height: 24
+            width: parent.width; height: 24
             color: c.bg2
 
             Rectangle {
@@ -282,8 +223,7 @@ Rectangle {
                 required property var modelData
                 required property int index
 
-                width: parent.width
-                height: 32
+                width: parent.width; height: 32
                 color: newItemMa.containsMouse ? c.bg2 : "transparent"
 
                 Rectangle {
@@ -332,70 +272,13 @@ Rectangle {
             }
         }
 
-        Rectangle {
-            visible: root.scanPageCount > 1
+        Paginator {
             width: parent.width
-            height: 28
-            color: c.bg2
-
-            RowLayout {
-                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-
-                Text {
-                    text: (root.scanPage + 1) + " / " + root.scanPageCount
-                    font { pixelSize: 10; family: "JetBrains Mono Nerd Font" }
-                    color: c.fg2
-                    Layout.fillWidth: true
-                }
-
-                Row {
-                    spacing: 4
-
-                    Rectangle {
-                        width: 22; height: 18
-                        color: prevScanMa.containsMouse ? c.bg3 : "transparent"
-                        border { width: 1; color: root.scanPage > 0 ? c.bg3 : "transparent" }
-                        opacity: root.scanPage > 0 ? 1 : 0.3
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "‹"
-                            font { pixelSize: 13; family: "JetBrains Mono Nerd Font" }
-                            color: c.fg2
-                        }
-
-                        MouseArea {
-                            id: prevScanMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { if (root.scanPage > 0) root.scanPage-- }
-                        }
-                    }
-
-                    Rectangle {
-                        width: 22; height: 18
-                        color: nextScanMa.containsMouse ? c.bg3 : "transparent"
-                        border { width: 1; color: root.scanPage < root.scanPageCount - 1 ? c.bg3 : "transparent" }
-                        opacity: root.scanPage < root.scanPageCount - 1 ? 1 : 0.3
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "›"
-                            font { pixelSize: 13; family: "JetBrains Mono Nerd Font" }
-                            color: c.fg2
-                        }
-
-                        MouseArea {
-                            id: nextScanMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { if (root.scanPage < root.scanPageCount - 1) root.scanPage++ }
-                        }
-                    }
-                }
-            }
+            c: root.c
+            currentPage: root.scanPage
+            pageCount:   root.scanPageCount
+            onPrev: root.scanPage--
+            onNext: root.scanPage++
         }
     }
 }

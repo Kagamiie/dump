@@ -17,9 +17,13 @@ PanelWindow {
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     anchors { top: true; left: true; right: true; bottom: true }
 
-    function toggle() { visible = !visible }
-    function show()   { visible = true }
-    function hide()   { visible = false }
+    readonly property int tabOverview:   0
+    readonly property int tabWallpaper:  1
+    readonly property int tabSchedule:   2
+
+    function toggle()  { visible = !visible }
+    function show()    { visible = true }
+    function hide()    { visible = false }
 
     function showAt(anchor) {
         const pos = anchor.mapToGlobal(0, anchor.height)
@@ -30,9 +34,9 @@ PanelWindow {
 
     MouseArea { anchors.fill: parent; onClicked: root.visible = false }
 
-    property int offsetX: 800
-    property int offsetY: 44
-    property int activeTab: 0
+    property int offsetX:   800
+    property int offsetY:   44
+    property int activeTab: tabOverview
 
     Rectangle {
         x: offsetX; y: offsetY
@@ -62,7 +66,7 @@ PanelWindow {
                     Repeater {
                         id: tabsRepeater
                         model: [
-                            { label: "Overview", icon: root.g.utilsHamburger },
+                            { label: "Overview",  icon: root.g.utilsHamburger },
                             { label: "Wallpaper", icon: root.g.layoutFloating },
                             { label: "Schedule",  icon: root.g.layoutTile }
                         ]
@@ -71,8 +75,7 @@ PanelWindow {
                             required property var modelData
                             required property int index
 
-                            width: 352 / 3
-                            height: 32
+                            width: 352 / 3; height: 32
                             color: root.activeTab === index ? c.bg2 : tabMa.containsMouse ? c.bg2 : "transparent"
 
                             Rectangle {
@@ -92,8 +95,7 @@ PanelWindow {
                             }
 
                             Row {
-                                anchors.centerIn: parent
-                                spacing: 6
+                                anchors.centerIn: parent; spacing: 6
                                 Text {
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.icon
@@ -120,23 +122,25 @@ PanelWindow {
                 }
             }
 
-            // DND row — les Rectangle orphelins référençant `index` hors Repeater sont supprimés
+            // DND row
             Rectangle {
-                Layout.fillWidth: true
-                height: 32
+                Layout.fillWidth: true; height: 32
                 color: c.bg1
 
                 Rectangle {
                     anchors { left: parent.left; right: parent.right; top: parent.top }
-                    height: 1; color: c.bg3
+                    height: 1
+                    color: c.bg3
                 }
                 Rectangle {
                     anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                    width: 1; color: c.bg3
+                    width: 1
+                    color: c.bg3
                 }
                 Rectangle {
                     anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
-                    width: 1; color: c.bg3
+                    width: 1
+                    color: c.bg3
                 }
 
                 RowLayout {
@@ -184,7 +188,7 @@ PanelWindow {
                 Layout.fillWidth: true
                 Layout.margins: 16
                 spacing: 16
-                visible: root.activeTab === 0
+                visible: root.activeTab === root.tabOverview
 
                 NetworkPanel { Layout.fillWidth: true; c: root.c; g: root.g }
                 Rectangle    { Layout.fillWidth: true; height: 1; color: c.bg3 }
@@ -197,14 +201,14 @@ PanelWindow {
             WallpaperPicker {
                 Layout.fillWidth: true
                 Layout.margins: 16
-                visible: root.activeTab === 1
+                visible: root.activeTab === root.tabWallpaper
                 c: root.c; g: root.g
             }
 
             WeekSchedule {
                 Layout.fillWidth: true
                 Layout.margins: 16
-                visible: root.activeTab === 2
+                visible: root.activeTab === root.tabSchedule
                 c: root.c
             }
         }

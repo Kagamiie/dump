@@ -34,9 +34,8 @@ PanelWindow {
             nixResults = []
             nixStatus = ""
             nixSelected = 0
-            searchBar.clear()          // ← ajouter ça
+            searchBar.clear()
             logic.updateFilter()
-            Qt.callLater(() => searchBar.searchInput.forceActiveFocus())
         }
     }
 
@@ -50,11 +49,10 @@ PanelWindow {
         nixStatus = ""
         nixSelected = 0
         searchBar.searchInput.text = ""
-        logic.updateFilter()  // add this
+        logic.updateFilter()
         Qt.callLater(() => searchBar.searchInput.forceActiveFocus())
     }
 
-    // Apps state
     property string query:         ""
     property var    apps:          []
     property var    filtered:      []
@@ -77,7 +75,6 @@ PanelWindow {
         selectedIndex = i
     }
 
-    // Nix state
     property string nixQuery:    ""
     property var    nixResults:  []
     property int    nixSelected: 0
@@ -86,7 +83,6 @@ PanelWindow {
 
     LauncherLogic { id: logic; root: root }
 
-    // Backdrop
     Rectangle {
         anchors.fill: parent
         color: "#000000"

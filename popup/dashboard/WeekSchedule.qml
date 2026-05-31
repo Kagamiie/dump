@@ -9,10 +9,9 @@ ColumnLayout {
     required property Colors c
     spacing: 4
 
-    property var    events:      []
-    property var    buffer:      []
-    property var    grouped:     ({})
-    property string todayStr:    fmtDate(new Date())
+    property var    events:   []
+    property var    grouped:  ({})
+    property string todayStr: _fmtDate(new Date())
 
     property var  hoveredEvent: null
     property real tooltipX:     0
@@ -29,15 +28,19 @@ ColumnLayout {
             midnight.setHours(24, 0, 0, 0)
             return midnight - now
         }
-        repeat: false
-        running: true
-        onTriggered: { todayStr = fmtDate(new Date()); fetchProc.running = false; Qt.callLater(() => fetchProc.running = true) }
+        repeat: false; running: true
+        onTriggered: {
+            todayStr = _fmtDate(new Date())
+            _triggerFetch()
+            interval = 86400000
+            repeat   = true
+        }
     }
 
     function monday() {
-        const d = new Date()
+        const d    = new Date()
         const diff = (d.getDay() === 0 ? -6 : 1 - d.getDay())
-        const m = new Date(d)
+        const m    = new Date(d)
         m.setDate(d.getDate() + diff)
         return m
     }
@@ -49,7 +52,7 @@ ColumnLayout {
         return s
     }
 
-    function fmtDate(d) {
+    function _fmtDate(d) {
         return d.getFullYear() + "-" +
                (d.getMonth() + 1).toString().padStart(2, "0") + "-" +
                d.getDate().toString().padStart(2, "0")
@@ -60,9 +63,9 @@ ColumnLayout {
         return days[new Date(dateStr + "T12:00:00").getDay()]
     }
 
-    function groupByDay() {
+    function _groupByDay(evts) {
         const groups = {}
-        for (const e of events) {
+        for (const e of evts) {
             if (!groups[e.date]) groups[e.date] = []
             groups[e.date].push(e)
         }
@@ -70,54 +73,63 @@ ColumnLayout {
     }
 
     readonly property var days: {
-        const m = monday()
+        const m   = monday()
         const arr = []
         for (let i = 0; i < 7; i++) {
             const d = new Date(m)
             d.setDate(m.getDate() + i)
-            arr.push(fmtDate(d))
+            arr.push(_fmtDate(d))
         }
         return arr
     }
 
+    function _triggerFetch() {
+        fetchProc.startDate = _fmtDate(monday())
+        fetchProc.endDate   = _fmtDate(sunday())
+        fetchProc.running   = false
+        Qt.callLater(() => fetchProc.running = true)
+    }
+
     Timer {
         interval: 300000; repeat: true; running: true; triggeredOnStart: true
-        onTriggered: {
-            fetchProc.startDate = fmtDate(monday())
-            fetchProc.endDate   = fmtDate(sunday())
-            fetchProc.running   = false
-            Qt.callLater(() => fetchProc.running = true)
-        }
+        onTriggered: _triggerFetch()
     }
 
     Process {
         id: fetchProc
         property string startDate: ""
         property string endDate:   ""
-        command: ["sh", "-c", "gcalcli --nocolor agenda " + startDate + " " + endDate + " --details all --tsv 2>/dev/null"]
+        property var    buffer:    []
+
+        command: ["sh", "-c",
+            "gcalcli --nocolor agenda " + startDate + " " + endDate +
+            " --details all --tsv 2>/dev/null"]
 
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
                 const event = parser.parseLine(line)
-                if (event) buffer.push(event)
+                if (event) fetchProc.buffer.push(event)
             }
         }
 
         onRunningChanged: { if (running) buffer = [] }
+
         onExited: code => {
-            if (code !== 0) { gcalError = true; return }
-            events = buffer.slice()
-            grouped = ({})
-            Qt.callLater(() => { grouped = groupByDay() })
+            if (code !== 0) {
+                gcalError = true
+                console.warn("WeekSchedule: gcalcli exited with code", code)
+                return
+            }
+            gcalError = false
+            const evts = buffer.slice()
+
+            events  = evts
+            grouped = _groupByDay(evts)
         }
     }
 
-    Component.onCompleted: {
-        fetchProc.startDate = fmtDate(monday())
-        fetchProc.endDate   = fmtDate(sunday())
-        fetchProc.running   = true
-    }
+    Component.onCompleted: _triggerFetch()
 
     Repeater {
         model: days
@@ -145,10 +157,7 @@ ColumnLayout {
                 }
             }
 
-            Rectangle {
-                x: 32; width: 1; height: parent.height
-                color: c.bg3
-            }
+            Rectangle { x: 32; width: 1; height: parent.height; color: c.bg3 }
 
             Flow {
                 id: eventsFlow
@@ -168,10 +177,7 @@ ColumnLayout {
                         color: hov ? c.bg3 : c.bg2
                         border { width: 1; color: isToday ? c.accent : hov ? c.fg2 : c.bg3 }
 
-                        Rectangle {
-                            width: 2; height: parent.height
-                            color: isToday ? c.accent : c.fg2
-                        }
+                        Rectangle { width: 2; height: parent.height; color: isToday ? c.accent : c.fg2 }
 
                         RowLayout {
                             id: chipRow
@@ -224,17 +230,24 @@ ColumnLayout {
     }
 
     Text {
-        visible: events.length === 0
+        visible: events.length === 0 && !gcalError
         text: "No events this week"
         font { pixelSize: 10; family: "JetBrains Mono Nerd Font" }
         color: c.bg4
         Layout.alignment: Qt.AlignHCenter
     }
 
+    Text {
+        visible: gcalError
+        text: "Calendar unavailable"
+        font { pixelSize: 10; family: "JetBrains Mono Nerd Font" }
+        color: c.red
+        Layout.alignment: Qt.AlignHCenter
+    }
+
     Rectangle {
         visible: hoveredEvent !== null
-        x: tooltipX
-        y: tooltipY
+        x: tooltipX; y: tooltipY
         z: 99
         width: 200
         implicitHeight: tipCol.implicitHeight + 12

@@ -1,4 +1,5 @@
 module Themes
 singleton Config 1.0 Config.qml
-Colors 1.0 Colors.qml
-Glyphs 1.0 Glyphs.qml
+Colors    1.0 Colors.qml
+Glyphs    1.0 Glyphs.qml
+Paginator 1.0 Paginator.qml

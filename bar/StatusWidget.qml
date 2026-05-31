@@ -13,23 +13,61 @@ Item {
     property bool   muted:   AudioService.muted
     property int    percent: 0
     property string status:  "Unknown"
+    property string _batPath: ""
 
     onVolumeChanged: volumeOsd.show(volume, muted)
     onMutedChanged:  volumeOsd.show(volume, muted)
 
+    Process {
+        id: _batDiscoverProc
+        command: ["sh", "-c",
+            "ls /sys/class/power_supply/ | grep -E '^BAT' | head -1"]
+        running: true
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: line => {
+                const name = line.trim()
+                if (name) {
+                    _batPath = "/sys/class/power_supply/" + name
+
+                    if (_batPath !== "") {
+                        batProc.running = true
+                        _batPollTimer.running = true
+                    }                }
+            }
+        }
+    }
+
     Timer {
-        interval: 30000; repeat: true; running: true; triggeredOnStart: true
-        onTriggered: batProc.running = true
+        id: _batPollTimer
+        interval: 30000; repeat: true; running: false; triggeredOnStart: false
+        onTriggered: { if (_batPath !== "") batProc.running = true }
     }
 
     Process {
         id: batProc
-        command: ["sh", "-c", "echo $(cat /sys/class/power_supply/BAT0/capacity) $(cat /sys/class/power_supply/BAT0/status)"]
+        command: ["sh", "-c",
+            "[ -f '" + _batPath + "/capacity' ] && " +
+            "echo $(cat '" + _batPath + "/capacity') $(cat '" + _batPath + "/status') || " +
+            "echo '0 Unknown'"]
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
                 const parts = line.trim().split(" ")
-                if (parts.length >= 2) { percent = parseInt(parts[0]); status = parts[1] }
+                if (parts.length >= 2) {
+                    percent = parseInt(parts[0]) || 0
+                    status  = parts[1]
+                }
+            }
+        }
+    }
+
+    Connections {
+        target: parent
+        function on_BatPathChanged() {
+            if (_batPath !== "") {
+                batProc.running = true
+                _batPollTimer.running = true
             }
         }
     }
@@ -76,6 +114,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 font { family: "JetBrains Mono Nerd Font"; pixelSize: 10 }
                 color: percent <= 20 ? c.red : c.fg3
+
+                visible: _batPath !== ""
                 text: percent + "%"
             }
         }

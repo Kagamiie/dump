@@ -11,10 +11,15 @@ QtObject {
     property int    micVol:   0
     property bool   micMuted: false
     property string micLabel: "Microphone"
-
     property var subscribeProc: Process {
         command: ["pactl", "subscribe"]
         running: true
+        onRunningChanged: {
+            if (!running) {
+                console.warn("AudioService: pactl subscribe died, restarting in 2s")
+                _subscribeRestartTimer.restart()
+            }
+        }
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
@@ -22,6 +27,12 @@ QtObject {
                 if (line.includes("source"))                          sourceProc.running = true
             }
         }
+    }
+
+    property var _subscribeRestartTimer: Timer {
+        id: _subscribeRestartTimer
+        interval: 2000; repeat: false
+        onTriggered: subscribeProc.running = true
     }
 
     property var sinkProc: Process {

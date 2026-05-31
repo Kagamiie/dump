@@ -16,7 +16,6 @@ PanelWindow {
     anchors { top: true; left: true; right: true; bottom: true }
 
     function toggleAt(px, py) {
-        // Stocker les coordonnées cibles
         popup.targetX = px
         popup.targetY = py
         visible = !visible
@@ -39,10 +38,8 @@ PanelWindow {
         border.width: 1
         border.color: c.bg3
 
-        // Recalculer x/y quand height est connu ET visible
         x: targetX
         y: {
-            // height est 0 avant le premier rendu — utiliser 36 comme fallback
             const h = height > 0 ? height : 36
             return targetY - (h - 15)
         }

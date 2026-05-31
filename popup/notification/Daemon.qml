@@ -16,15 +16,23 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    anchors {
-        right: true
-        bottom: true
-    }
+    anchors { right: true; bottom: true }
 
     implicitWidth:  notifCol.implicitWidth  > 0 ? notifCol.implicitWidth  + 16 : 1
     implicitHeight: notifCol.implicitHeight > 0 ? notifCol.implicitHeight + 16 : 1
 
     property Component toastComponent: Component { Toast {} }
+
+    Timer {
+        interval: 60000; repeat: true; running: true
+        onTriggered: {
+            const keys = Object.keys(server.activeNotifs)
+            for (const k of keys) {
+                const obj = server.activeNotifs[k]
+                if (!obj || obj === null) delete server.activeNotifs[k]
+            }
+        }
+    }
 
     Process {
         id: saveProc
@@ -56,7 +64,9 @@ PanelWindow {
                 invoke: () => {
                     openProc.cmd = "vesktop"
                     openProc.running = true
-                    try { a.invoke() } catch(_) {}
+                    try { a.invoke() } catch(e) {
+                        console.warn("Daemon: discord action invoke failed:", e)
+                    }
                 }
             }))
         }
@@ -65,7 +75,11 @@ PanelWindow {
             return notif.actions.map(a => ({
                 id:     a.identifier,
                 text:   a.text,
-                invoke: () => { try { a.invoke() } catch(_) {} }
+                invoke: () => {
+                    try { a.invoke() } catch(e) {
+                        console.warn("Daemon: blueman action invoke failed:", e)
+                    }
+                }
             }))
         }
 
@@ -85,7 +99,9 @@ PanelWindow {
                         cancelProc.cmd = "rm -f '" + file + "'"
                         cancelProc.running = true
                     }
-                    try { a.invoke() } catch(_) {}
+                    try { a.invoke() } catch(e) {
+                        console.warn("Daemon: action invoke failed:", e)
+                    }
                 }
             }
         })
@@ -97,17 +113,25 @@ PanelWindow {
         property var activeNotifs: ({})
 
         onNotification: notif => {
-            if (root.dnd) { try { notif.expire() } catch(_) {} return }
+            if (root.dnd) {
+                try { notif.expire() } catch(e) {
+                    console.warn("Daemon: failed to expire DND notification:", e)
+                }
+                return
+            }
 
             if (root.toastComponent.status !== Component.Ready) {
-                console.error("Toast component error:", root.toastComponent.errorString())
+                console.error("Daemon: Toast component error:", root.toastComponent.errorString())
                 return
             }
 
             const appName = notif.appName ?? ""
-            const key     = appName + "|" + (notif.hints["sender-pid"] ?? "")
+            const pid = notif.hints["sender-pid"]
+            const key = pid
+                ? String(pid) + "::" + appName
+                : "nopid::" + appName.replace(/::/g, "__")
 
-            const existing = activeNotifs[key]
+            const existing = server.activeNotifs[key]
             if (existing) {
                 existing.notifSummary = notif.summary ?? ""
                 existing.notifBody    = notif.body    ?? ""
@@ -116,7 +140,9 @@ PanelWindow {
                 existing.notifActions = root.buildActions(notif)
                 existing.notifCount   = (existing.notifCount ?? 1) + 1
                 existing.resetTimer()
-                try { notif.expire() } catch(_) {}
+                try { notif.expire() } catch(e) {
+                    console.warn("Daemon: failed to expire stacked notification:", e)
+                }
                 return
             }
 
@@ -134,16 +160,25 @@ PanelWindow {
             })
 
             if (!obj) {
-                console.error("Failed to create Toast")
+                console.error("Daemon: failed to create Toast object")
                 return
             }
 
-            activeNotifs[key] = obj
+            server.activeNotifs[key] = obj
 
             obj.dismissed.connect(function() {
-                if (activeNotifs[key] === obj) delete activeNotifs[key]
-                try { notif.expire() } catch(_) {}
-                obj.destroy()
+                if (server.activeNotifs[key] === obj) {
+                    delete server.activeNotifs[key]
+                }
+                try { notif.expire() } catch(e) {
+                    console.warn("Daemon: failed to expire dismissed notification:", e)
+                }
+
+                Qt.callLater(() => {
+                    try { obj.destroy() } catch(e) {
+                        console.warn("Daemon: failed to destroy toast:", e)
+                    }
+                })
             })
         }
     }

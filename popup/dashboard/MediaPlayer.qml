@@ -10,8 +10,6 @@ Item {
 
     property int playerIndex: 0
     property var player: null
-
-    // Compteur de tick pour forcer la réévaluation des bindings de position
     property int _tick: 0
 
     Component.onCompleted: updatePlayer()
@@ -145,7 +143,7 @@ Item {
 
                     Text {
                         text: {
-                            _tick  // dépendance au tick pour forcer la réévaluation
+                            _tick
                             if (!player) return "00:00 / 00:00"
                             const fmt = s => Math.floor(s / 60).toString().padStart(2, "0") + ":" +
                                              (s % 60).toString().padStart(2, "0")
@@ -188,7 +186,6 @@ Item {
                 height: 4; color: c.bg2
 
                 Rectangle {
-                    // _tick dans le binding pour forcer la réévaluation de position
                     width: {
                         _tick
                         return player && (player.length ?? 0) > 0

@@ -8,57 +8,65 @@ ColumnLayout {
     required property Glyphs g
     spacing: 8
 
-    property var    wallpapers: []
-    property string current:    ""
-    property int    wallPage:   0
+    property var    wallpapers:       []
+    property string _activeWallPath:  ""
+    property string _pendingWallPath: ""
+    property int    wallPage:         0
 
     property int pageCount: Math.ceil(wallpapers.length / 9)
 
     onWallpapersChanged: wallPage = 0
 
-    Component.onCompleted: listProc.running = true
+    Component.onCompleted: _listProc.running = true
 
     Process {
-        id: listProc
-        command: ["bash", "-c", "find /home/ks/Documents/Medias/Wallpapers -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) | sort"]
+        id: _listProc
+        command: ["find", Config.wallpapersDir, "-maxdepth", "1", "-type", "f",
+                  "(", "-iname", "*.jpg",  "-o", "-iname", "*.jpeg",
+                  "-o", "-iname", "*.png", "-o", "-iname", "*.webp", ")",
+                  "-print0"]
         stdout: SplitParser {
-            splitMarker: "\n"
+            splitMarker: "\0"
             property var buf: []
             onRead: line => { if (line.trim()) buf.push(line.trim()) }
         }
-        onRunningChanged: {
-            if (running) stdout.buf = []
-            else         wallpapers = stdout.buf.slice()
+        onRunningChanged: { if (running) stdout.buf = [] }
+        onExited: {
+            const sorted = stdout.buf.slice().sort()
+            wallpapers = sorted
         }
     }
 
     Process {
-        id: setWallProc
-        property string pendingPath: ""
-        property string activePath:  ""
-
-        command: ["swaybg", "-i", activePath, "-m", "fill"]
+        id: _killProc
+        command: ["pkill", "-x", "swaybg"]
 
         onExited: {
-            // Si un autre wallpaper a été demandé pendant qu'on tournait
-            if (pendingPath !== "" && pendingPath !== activePath) {
-                activePath  = pendingPath
-                pendingPath = ""
-                running     = true
+            if (_pendingWallPath !== "") {
+                _launchProc.wallPath  = _pendingWallPath
+                _activeWallPath       = _pendingWallPath
+                _pendingWallPath      = ""
+                _launchProc.running   = true
+            }
+        }
+    }
+
+    Process {
+        id: _launchProc
+        property string wallPath: ""
+        command: ["swaybg", "-i", wallPath, "-m", "fill"]
+        onRunningChanged: {
+            if (!running && wallPath !== "") {
+                console.warn("WallpaperPicker: swaybg exited unexpectedly for", wallPath)
             }
         }
     }
 
     function setWallpaper(path) {
-        if (path === setWallProc.activePath) return
-        if (setWallProc.running) {
-            // Process occupé → mettre en file d'attente
-            setWallProc.pendingPath = path
-        } else {
-            setWallProc.activePath  = path
-            setWallProc.pendingPath = ""
-            setWallProc.running     = true
-        }
+        if (path === _activeWallPath) return
+        _pendingWallPath = path
+        _killProc.running = false
+        Qt.callLater(() => _killProc.running = true)
     }
 
     RowLayout {
@@ -88,8 +96,8 @@ ColumnLayout {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    listProc.running = false
-                    Qt.callLater(() => listProc.running = true)
+                    _listProc.running = false
+                    Qt.callLater(() => _listProc.running = true)
                 }
             }
         }
@@ -107,7 +115,7 @@ ColumnLayout {
                 required property string modelData
                 required property int    index
 
-                property bool isActive: modelData === current
+                property bool isActive: modelData === _activeWallPath
 
                 width: parent.cellW; height: parent.cellW * 9 / 16
                 color: c.bg2
@@ -140,64 +148,18 @@ ColumnLayout {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        current = modelData
-                        setWallpaper(modelData)
-                    }
+                    onClicked: setWallpaper(modelData)
                 }
             }
         }
     }
 
-    Rectangle {
-        visible: pageCount > 1
+    Paginator {
         Layout.fillWidth: true
-        height: 28
-        color: c.bg2
-        border { width: 1; color: c.bg3 }
-
-        RowLayout {
-            anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-
-            Text {
-                text: (wallPage + 1) + " / " + pageCount
-                font { pixelSize: 10; family: "JetBrains Mono Nerd Font" }
-                color: c.fg2
-                Layout.fillWidth: true
-            }
-
-            Row {
-                spacing: 4
-
-                Repeater {
-                    model: [
-                        { text: "‹", enabled: wallPage > 0,             action: () => wallPage-- },
-                        { text: "›", enabled: wallPage < pageCount - 1, action: () => wallPage++ }
-                    ]
-                    delegate: Rectangle {
-                        required property var modelData
-                        width: 22; height: 18
-                        color: pgMa.containsMouse ? c.bg3 : "transparent"
-                        border { width: 1; color: modelData.enabled ? c.bg3 : "transparent" }
-                        opacity: modelData.enabled ? 1 : 0.3
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: modelData.text
-                            font { pixelSize: 13; family: "JetBrains Mono Nerd Font" }
-                            color: c.fg2
-                        }
-
-                        MouseArea {
-                            id: pgMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: { if (modelData.enabled) modelData.action() }
-                        }
-                    }
-                }
-            }
-        }
+        c: parent.c
+        currentPage: wallPage
+        pageCount:   pageCount
+        onPrev: wallPage--
+        onNext: wallPage++
     }
 }

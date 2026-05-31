@@ -1,4 +1,3 @@
-// themes/Config.qml
 pragma Singleton
 import QtQuick
 

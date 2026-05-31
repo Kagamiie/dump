@@ -1,8 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-
 import "../themes/"
-
 
 Item {
     required property Colors c
@@ -24,8 +22,9 @@ Item {
             delegate: Rectangle {
                 required property var modelData
                 height: 24
+
                 Layout.fillWidth: true
-                width: Math.min(lbl.implicitWidth + 26, 200)
+                Layout.maximumWidth: 200
                 color: modelData.focused ? c.bg2 : c.bg1
                 border.width: 1
                 border.color: c.bg3

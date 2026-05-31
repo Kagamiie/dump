@@ -41,7 +41,6 @@ QtObject {
         btListProc.running = true
     }
 
-    // Poll toutes les 10s
     property var _pollTimer: Timer {
         interval: 10000
         repeat: true

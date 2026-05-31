@@ -7,7 +7,7 @@ Item {
     required property var screen
 
     property var workspaces: []
-    property var windows: []
+    property var windows:    []
 
     function parseWorkspaces(text) {
         try {
@@ -21,7 +21,9 @@ Item {
                 }))
                 .filter(ws => !root.screen || ws.output === root.screen.name)
                 .sort((a, b) => a.idx - b.idx)
-        } catch (_) {}
+        } catch(e) {
+            console.warn("Niri: failed to parse workspaces:", e)
+        }
     }
 
     function parseWindows(text) {
@@ -34,7 +36,9 @@ Item {
                     col:     w.layout?.pos_in_scrolling_layout?.[0] ?? 9999
                 }))
                 .sort((a, b) => a.col - b.col)
-        } catch (_) {}
+        } catch(e) {
+            console.warn("Niri: failed to parse windows:", e)
+        }
     }
 
     Process {
@@ -50,8 +54,15 @@ Item {
     }
 
     Process {
+        id: eventStream
         command: ["niri", "msg", "--json", "event-stream"]
         running: true
+        onRunningChanged: {
+            if (!running) {
+                console.warn("Niri: event stream died, reconnecting in 2s")
+                _reconnectTimer.restart()
+            }
+        }
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
@@ -60,9 +71,17 @@ Item {
                     const key = Object.keys(JSON.parse(line))[0] ?? ""
                     if (/[Ww]orkspace/.test(key)) wsProc.running = true
                     if (/[Ww]indow/.test(key))    winProc.running = true
-                } catch (_) {}
+                } catch(e) {
+                    console.warn("Niri: failed to parse event:", e)
+                }
             }
         }
+    }
+
+    Timer {
+        id: _reconnectTimer
+        interval: 2000; repeat: false
+        onTriggered: eventStream.running = true
     }
 
     Component.onCompleted: { wsProc.running = true; winProc.running = true }

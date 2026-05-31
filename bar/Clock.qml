@@ -15,6 +15,37 @@ Item {
     property bool   hoveredWeather:  false
     property string weatherIcon:     WeatherService.icon
     property string weatherTemp:     WeatherService.tempC
+    property string _dateLabel: ""
+
+    function _buildDateLabel() {
+        const d = new Date()
+        const months = ["January","February","March","April","May","June",
+                        "July","August","September","October","November","December"]
+        const day = d.getDate()
+        const suf = (day > 3 && day < 21) ? "th"
+                  : ({1:"st",2:"nd",3:"rd"}[day % 10] ?? "th")
+        _dateLabel = months[d.getMonth()] + " " + day + suf
+    }
+
+    Component.onCompleted: _buildDateLabel()
+
+    Timer {
+        id: _midnightTimer
+        interval: {
+            const now = new Date()
+            const midnight = new Date(now)
+            midnight.setHours(24, 0, 0, 0)
+            return midnight - now
+        }
+        repeat: false
+        running: true
+        onTriggered: {
+            clockRoot._buildDateLabel()
+
+            interval = 86400000
+            repeat   = true
+        }
+    }
 
     SystemClock { id: clk; precision: SystemClock.Seconds }
 
@@ -44,15 +75,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 color: clockRoot.hoveredDateTime ? c.accent : c.fg0
                 font { pixelSize: 12; family: "JetBrains Mono Nerd Font" }
-                text: {
-                    clk.seconds
-                    const d = new Date()
-                    const months = ["January","February","March","April","May","June",
-                                    "July","August","September","October","November","December"]
-                    const day = d.getDate()
-                    const suf = (day > 3 && day < 21) ? "th" : ({1:"st",2:"nd",3:"rd"}[day % 10] ?? "th")
-                    return months[d.getMonth()] + " " + day + suf
-                }
+                text: clockRoot._dateLabel
             }
 
             Text {

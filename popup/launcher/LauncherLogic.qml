@@ -5,9 +5,9 @@ Item {
     required property var root
     visible: false
 
-    Component.onCompleted: loadApps.running = true
+    Component.onCompleted: _loadApps.running = true
 
-    property var loadApps: Process {
+    property var _loadApps: Process {
         command: ["bash", "-c",
             "IFS=: read -ra dirs <<< \"$XDG_DATA_DIRS\"; " +
             "for dir in \"${dirs[@]}\"; do " +
@@ -22,13 +22,22 @@ Item {
             "done; done | sort -u"]
         stdout: SplitParser {
             splitMarker: "\n"
+            property var buf: []
             onRead: line => {
                 const parts = line.split("|")
                 if (parts.length >= 2 && parts[0].trim())
-                    root.apps.push({ name: parts[0].trim(), exec: parts[1].trim(), icon: parts[2]?.trim() ?? "" })
+                    buf.push({
+                        name: parts[0].trim(),
+                        exec: parts[1].trim(),
+                        icon: parts[2]?.trim() ?? ""
+                    })
             }
         }
-        onExited: { root.apps = root.apps; root.updateFilter() }
+        onRunningChanged: { if (running) stdout.buf = [] }
+        onExited: {
+            root.apps = stdout.buf.slice()
+            updateFilter()
+        }
     }
 
     function updateFilter() {
@@ -39,13 +48,13 @@ Item {
         root.filtered = [...starts, ...contains]
     }
 
-    property var nixTimer: Timer {
+    property var _nixTimer: Timer {
         id: nixTimer
         interval: 400
-        onTriggered: doNixSearch()
+        onTriggered: _doNixSearch()
     }
 
-    property var nixProc: Process {
+    property var _nixProc: Process {
         id: nixProc
         property string q: ""
         command: ["nix", "search", "nixpkgs", nixProc.q, "--json",
@@ -67,6 +76,7 @@ Item {
                         ? root.nixResults.length + " result" + (root.nixResults.length > 1 ? "s" : "")
                         : "No results"
                 } catch(e) {
+                    console.warn("LauncherLogic: nix search parse error:", e)
                     root.nixStatus  = "No results"
                     root.nixResults = []
                 }
@@ -74,7 +84,7 @@ Item {
         }
     }
 
-    function doNixSearch() {
+    function _doNixSearch() {
         if (root.nixQuery.length < 2) return
         root.nixLoading = true
         root.nixStatus  = ""
@@ -84,34 +94,34 @@ Item {
         Qt.callLater(() => nixProc.running = true)
     }
 
-    property var clipProc: Process {
+    property var _clipProc: Process {
         property string t: ""
         command: ["wl-copy", "--", t]
     }
 
-    property var notifProc: Process {
+    property var _notifProc: Process {
         property string m: ""
         command: ["notify-send", "-t", "2000", "nixpkgs", m]
     }
 
-    property var launchProc: Process {
+    property var _launchProc: Process {
         property string cmd: ""
         command: ["sh", "-c", cmd + " &"]
     }
 
     function copyAttr(attr) {
-        clipProc.t = attr
-        clipProc.running = false
-        Qt.callLater(() => clipProc.running = true)
-        notifProc.m = "Copied: " + attr
-        notifProc.running = false
-        Qt.callLater(() => notifProc.running = true)
+        _clipProc.t = attr
+        _clipProc.running = false
+        Qt.callLater(() => _clipProc.running = true)
+        _notifProc.m = "Copied: " + attr
+        _notifProc.running = false
+        Qt.callLater(() => _notifProc.running = true)
         root.visible = false
     }
 
     function launch(app) {
-        launchProc.cmd = app.exec
-        launchProc.running = true
+        _launchProc.cmd = app.exec
+        _launchProc.running = true
         root.visible = false
     }
 
