@@ -34,14 +34,31 @@ ColumnLayout {
 
     Process {
         id: setWallProc
-        property string path: ""
-        command: ["bash", "-c",
-            "OLD=$(cat /tmp/qs_swaybg.pid 2>/dev/null); " +
-            "swaybg -i \"" + path + "\" -m fill & " +
-            "echo $! > /tmp/qs_swaybg.pid; " +
-            "[ -n \"$OLD\" ] && kill \"$OLD\" 2>/dev/null; " +
-            "true"
-        ]
+        property string pendingPath: ""
+        property string activePath:  ""
+
+        command: ["swaybg", "-i", activePath, "-m", "fill"]
+
+        onExited: {
+            // Si un autre wallpaper a été demandé pendant qu'on tournait
+            if (pendingPath !== "" && pendingPath !== activePath) {
+                activePath  = pendingPath
+                pendingPath = ""
+                running     = true
+            }
+        }
+    }
+
+    function setWallpaper(path) {
+        if (path === setWallProc.activePath) return
+        if (setWallProc.running) {
+            // Process occupé → mettre en file d'attente
+            setWallProc.pendingPath = path
+        } else {
+            setWallProc.activePath  = path
+            setWallProc.pendingPath = ""
+            setWallProc.running     = true
+        }
     }
 
     RowLayout {
@@ -125,9 +142,7 @@ ColumnLayout {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         current = modelData
-                        setWallProc.path = modelData
-                        setWallProc.running = false
-                        Qt.callLater(() => setWallProc.running = true)
+                        setWallpaper(modelData)
                     }
                 }
             }
@@ -156,8 +171,8 @@ ColumnLayout {
 
                 Repeater {
                     model: [
-                        { text: "‹", enabled: wallPage > 0,              action: () => wallPage-- },
-                        { text: "›", enabled: wallPage < pageCount - 1,  action: () => wallPage++ }
+                        { text: "‹", enabled: wallPage > 0,             action: () => wallPage-- },
+                        { text: "›", enabled: wallPage < pageCount - 1, action: () => wallPage++ }
                     ]
                     delegate: Rectangle {
                         required property var modelData

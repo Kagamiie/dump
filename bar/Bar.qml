@@ -15,7 +15,7 @@ Item {
 
     Niri { id: ipc; screen: bar.screen }
 
-    property string avatarSource: "file:///home/ks/Documents/Medias/avatars/89704351.png"
+    property string avatarSource: "file://" + Config.avatarPath
 
     Rectangle { anchors.fill: parent; color: c.bg0 }
     Rectangle {
@@ -32,7 +32,11 @@ Item {
             Layout.fillWidth: false
             Workspaces { screen: bar.screen; c: bar.c; ipc: ipc }
             Item { width: 8 }
-            Rectangle { Layout.fillHeight: true }
+            Rectangle {
+                Layout.preferredWidth: 1
+                Layout.fillHeight: true
+                color: c.bg3
+            }
             SearchBtn { c: bar.c; g: bar.g; launcher: bar.appLauncher }
             Item { width: 8 }
         }
@@ -49,7 +53,6 @@ Item {
                     leftMargin: 9
                     rightMargin: 9
                 }
-
                 c: bar.c
                 ipc: ipc
             }

@@ -16,8 +16,9 @@ PanelWindow {
     anchors { top: true; left: true; right: true; bottom: true }
 
     function toggleAt(px, py) {
-        popup.x = px
-        popup.y = py - (popup.height-15)
+        // Stocker les coordonnées cibles
+        popup.targetX = px
+        popup.targetY = py
         visible = !visible
     }
 
@@ -29,11 +30,22 @@ PanelWindow {
     Rectangle {
         id: popup
 
+        property int targetX: 0
+        property int targetY: 0
+
         width: row.implicitWidth + 16
         height: 36
         color: c.bg1
         border.width: 1
         border.color: c.bg3
+
+        // Recalculer x/y quand height est connu ET visible
+        x: targetX
+        y: {
+            // height est 0 avant le premier rendu — utiliser 36 comme fallback
+            const h = height > 0 ? height : 36
+            return targetY - (h - 15)
+        }
 
         Row {
             id: row
@@ -58,7 +70,9 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: mouse => {
-                            mouse.button === Qt.LeftButton ? modelData.activate() : modelData.secondaryActivate()
+                            mouse.button === Qt.LeftButton
+                                ? modelData.activate()
+                                : modelData.secondaryActivate()
                             root.visible = false
                         }
                     }

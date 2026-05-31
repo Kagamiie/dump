@@ -11,12 +11,16 @@ Item {
     property int playerIndex: 0
     property var player: null
 
+    // Compteur de tick pour forcer la réévaluation des bindings de position
+    property int _tick: 0
+
     Component.onCompleted: updatePlayer()
 
     Timer {
-        interval: 1000; repeat: true
+        interval: 1000
+        repeat: true
         running: player?.isPlaying ?? false
-        onTriggered: progressBar.forceUpdate()
+        onTriggered: _tick++
     }
 
     function cyclePlayer() {
@@ -141,9 +145,12 @@ Item {
 
                     Text {
                         text: {
+                            _tick  // dépendance au tick pour forcer la réévaluation
                             if (!player) return "00:00 / 00:00"
-                            const fmt = s => Math.floor(s/60).toString().padStart(2,"0") + ":" + (s%60).toString().padStart(2,"0")
-                            return fmt(Math.floor(player.position ?? 0)) + " / " + fmt(Math.floor(player.length ?? 0))
+                            const fmt = s => Math.floor(s / 60).toString().padStart(2, "0") + ":" +
+                                             (s % 60).toString().padStart(2, "0")
+                            return fmt(Math.floor(player.position ?? 0)) + " / " +
+                                   fmt(Math.floor(player.length   ?? 0))
                         }
                         font { pixelSize: 10; family: "JetBrains Mono Nerd Font" }
                         color: c.fg1
@@ -153,15 +160,14 @@ Item {
 
                     Repeater {
                         model: [
-                            { icon: g.mediaPrevious, action: () => player?.previous() },
+                            { icon: g.mediaPrevious, action: () => player?.previous()      },
                             { icon: player?.isPlaying ? g.mediaPause : g.mediaPlay,
-                              action: () => player?.togglePlaying() },
-                            { icon: g.mediaNext,     action: () => player?.next() }
+                              action: () => player?.togglePlaying()                        },
+                            { icon: g.mediaNext,     action: () => player?.next()          }
                         ]
                         delegate: Text {
                             required property var modelData
                             text: modelData.icon
-
                             font { family: gwnce.name; pixelSize: 14 }
                             color: ctrlMa.containsMouse ? c.accent : c.fg0
                             leftPadding: 8
@@ -182,8 +188,15 @@ Item {
                 height: 4; color: c.bg2
 
                 Rectangle {
-                    width: player && (player.length ?? 0) > 0 ? parent.width * (player.position ?? 0) / player.length : 0
-                    height: parent.height; color: c.accent
+                    // _tick dans le binding pour forcer la réévaluation de position
+                    width: {
+                        _tick
+                        return player && (player.length ?? 0) > 0
+                            ? parent.width * (player.position ?? 0) / player.length
+                            : 0
+                    }
+                    height: parent.height
+                    color: c.accent
                     Behavior on width { SmoothedAnimation { velocity: 20 } }
                 }
             }

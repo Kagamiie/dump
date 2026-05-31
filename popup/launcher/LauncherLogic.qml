@@ -14,10 +14,10 @@ Item {
             "[ -d \"$dir/applications\" ] || continue; " +
             "for f in \"$dir\"/applications/*.desktop; do " +
             "[ -f \"$f\" ] || continue; " +
-            "n=$(grep -m1 '^Name=' \"$f\" | cut -d= -f2); " +
-            "e=$(grep -m1 '^Exec=' \"$f\" | cut -d= -f2 | sed 's/ *%[a-zA-Z]//g'); " +
-            "i=$(grep -m1 '^Icon=' \"$f\" | cut -d= -f2); " +
-            "nd=$(grep -m1 '^NoDisplay=' \"$f\" | cut -d= -f2); " +
+            "n=$(grep -m1 '^Name=' \"$f\" | cut -d= -f2-); " +
+            "e=$(grep -m1 '^Exec=' \"$f\" | cut -d= -f2- | sed 's/ *%[a-zA-Z]//g'); " +
+            "i=$(grep -m1 '^Icon=' \"$f\" | cut -d= -f2-); " +
+            "nd=$(grep -m1 '^NoDisplay=' \"$f\" | cut -d= -f2-); " +
             "[ \"$nd\" != 'true' ] && [ -n \"$n\" ] && [ -n \"$e\" ] && echo \"$n|$e|$i\"; " +
             "done; done | sort -u"]
         stdout: SplitParser {
@@ -54,12 +54,12 @@ Item {
             onStreamFinished: {
                 root.nixLoading = false
                 try {
-                    const data = JSON.parse(this.text)
+                    const data    = JSON.parse(this.text)
                     const entries = Object.entries(data)
                     root.nixResults = entries.map(([key, v]) => ({
                         attr:    key.replace("legacyPackages.x86_64-linux.", ""),
-                        version: v.version      ?? "",
-                        desc:    v.description  ?? "No description",
+                        version: v.version     ?? "",
+                        desc:    v.description ?? "No description",
                         broken:  false,
                         unfree:  false
                     })).slice(0, 30)
@@ -67,7 +67,7 @@ Item {
                         ? root.nixResults.length + " result" + (root.nixResults.length > 1 ? "s" : "")
                         : "No results"
                 } catch(e) {
-                    root.nixStatus = "No results"
+                    root.nixStatus  = "No results"
                     root.nixResults = []
                 }
             }
@@ -86,12 +86,14 @@ Item {
 
     property var clipProc: Process {
         property string t: ""
-        command: ["sh", "-c", "echo -n '" + t + "' | wl-copy"]
+        command: ["wl-copy", "--", t]
     }
+
     property var notifProc: Process {
         property string m: ""
         command: ["notify-send", "-t", "2000", "nixpkgs", m]
     }
+
     property var launchProc: Process {
         property string cmd: ""
         command: ["sh", "-c", cmd + " &"]
@@ -113,7 +115,6 @@ Item {
         root.visible = false
     }
 
-    // Wire up reactive bindings
     Connections {
         target: root
         function onQueryChanged()    { updateFilter() }
