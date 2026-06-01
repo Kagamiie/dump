@@ -15,13 +15,22 @@ Item {
     required property string notifImage
     required property int    notifCount
 
-    property int stackIndex: 0
     signal dismissed
 
     implicitWidth:  320
     implicitHeight: card.implicitHeight
 
-    property bool _hovered: false
+    property bool _hovered:    false
+    // Guard contre le double-dismiss (clic + timeout au même tick, ou
+    // animation terminée pendant qu'un clic est en cours de traitement).
+    property bool _dismissing: false
+
+    // Point d'entrée unique pour tout dismiss — jamais appeler dismissed() directement.
+    function _dismiss() {
+        if (_dismissing) return
+        _dismissing = true
+        dismissed()
+    }
 
     function resetTimer() {
         progressAnim.stop()
@@ -29,10 +38,6 @@ Item {
         progressAnim.start()
     }
 
-    // FIX : ne pas démarrer l'animation avant que le composant soit visible et layouté.
-    // "running: true" au niveau de la déclaration se déclenche AVANT le premier layout pass,
-    // donc progressBar.width vaut 0 → l'animation va de 0 à 0 → invisible.
-    // On démarre dans Component.onCompleted, après que la largeur soit connue.
     Component.onCompleted: {
         progressAnim.start()
     }
@@ -42,15 +47,12 @@ Item {
         target: progressFill
         property: "width"
         from: 0
-        // FIX : utilise la largeur du card (320) directement au lieu de progressBar.width
-        // pour éviter la dépendance au layout pas encore calculé au démarrage
         to: 320
         duration: notifTimeout * 1000
-        running: false  // démarré dans Component.onCompleted
-        onFinished: root.dismissed()
+        running: false
+        onFinished: root._dismiss()
     }
 
-    // FIX : pause/resume basé sur _hovered (renommé pour éviter conflit avec prop QML "hovered")
     on_HoveredChanged: _hovered ? progressAnim.pause() : progressAnim.resume()
 
     MouseArea {
@@ -58,7 +60,7 @@ Item {
         hoverEnabled: true
         onEntered: root._hovered = true
         onExited:  root._hovered = false
-        onClicked: root.dismissed()
+        onClicked: root._dismiss()
         propagateComposedEvents: true
     }
 
@@ -67,8 +69,6 @@ Item {
         width: 320
         implicitWidth:  320
         implicitHeight: mainCol.implicitHeight
-        // FIX : les couleurs viennent de root.c (Colors passé en required property)
-        // Si c est null au rendu → tout blanc. Vérification défensive.
         color:        root.c ? root.c.bg0 : "#1b1b1b"
         border.width: 1
         border.color: root.c ? root.c.bg3 : "#3c3c3c"
@@ -135,7 +135,6 @@ Item {
                     Layout.fillWidth: true
                     spacing: 0
 
-                    // Header titre
                     Rectangle {
                         Layout.fillWidth: true
                         height: 32
@@ -169,7 +168,6 @@ Item {
                         }
                     }
 
-                    // Corps
                     Text {
                         Layout.fillWidth: true
                         Layout.margins: 10
@@ -180,7 +178,6 @@ Item {
                         visible: notifBody !== ""
                     }
 
-                    // Actions
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 0
@@ -227,14 +224,16 @@ Item {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: { modelData.invoke(); root.dismissed() }
+                                        onClicked: {
+                                            modelData.invoke()
+                                            root._dismiss()
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Barre de progression
                     Rectangle {
                         id: progressBar
                         Layout.fillWidth: true

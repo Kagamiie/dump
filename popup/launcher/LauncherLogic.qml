@@ -42,10 +42,20 @@ Item {
 
     function updateFilter() {
         const q = root.query.toLowerCase()
-        if (!q) { root.filtered = root.apps.slice(); return }
-        const starts   = root.apps.filter(a =>  a.name.toLowerCase().startsWith(q))
-        const contains = root.apps.filter(a => !a.name.toLowerCase().startsWith(q) && a.name.toLowerCase().includes(q))
-        root.filtered = [...starts, ...contains]
+        if (!q) {
+            root.filtered = root.apps.slice()
+            return
+        }
+        // Une seule passe au lieu de deux — évite O(2n) à chaque frappe.
+        const starts = []
+        const contains = []
+        for (let i = 0; i < root.apps.length; i++) {
+            const a = root.apps[i]
+            const n = a.name.toLowerCase()
+            if (n.startsWith(q))    starts.push(a)
+            else if (n.includes(q)) contains.push(a)
+        }
+        root.filtered = starts.concat(contains)
     }
 
     property var _nixTimer: Timer {

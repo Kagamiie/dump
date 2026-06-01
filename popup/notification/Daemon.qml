@@ -23,13 +23,29 @@ PanelWindow {
 
     property Component toastComponent: Component { Toast {} }
 
+    // Nettoyage défensif : détruire les Toasts qui n'auraient pas émis dismissed()
+    // (ex: animation bloquée, composant jamais visible). On vérifie _dismissing
+    // plutôt que null pour ne pas détruire un Toast encore actif.
     Timer {
         interval: 60000; repeat: true; running: true
         onTriggered: {
             const keys = Object.keys(server.activeNotifs)
             for (const k of keys) {
                 const obj = server.activeNotifs[k]
-                if (!obj || obj === null) delete server.activeNotifs[k]
+                if (!obj) {
+                    delete server.activeNotifs[k]
+                    continue
+                }
+                // Si le Toast a déjà commencé à se dismisser mais que l'objet
+                // est encore dans la map, c'est un leak — on nettoie.
+                if (obj._dismissing) {
+                    delete server.activeNotifs[k]
+                    Qt.callLater(() => {
+                        try { obj.destroy() } catch(e) {
+                            console.warn("Daemon: GC destroy failed:", e)
+                        }
+                    })
+                }
             }
         }
     }
@@ -132,7 +148,9 @@ PanelWindow {
                 : "nopid::" + appName.replace(/::/g, "__")
 
             const existing = server.activeNotifs[key]
-            if (existing) {
+            if (existing && !existing._dismissing) {
+                // Mettre à jour le Toast existant seulement s'il n'est pas
+                // en train de se fermer (évite un use-after-free).
                 existing.notifSummary = notif.summary ?? ""
                 existing.notifBody    = notif.body    ?? ""
                 existing.notifAppIcon = notif.appIcon ?? ""

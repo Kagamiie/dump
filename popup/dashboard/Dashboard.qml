@@ -68,14 +68,14 @@ PanelWindow {
                         model: [
                             { label: "Overview",  icon: root.g.utilsHamburger },
                             { label: "Wallpaper", icon: root.g.layoutFloating },
-                            { label: "Schedule",  icon: root.g.layoutTile }
                         ]
 
                         delegate: Rectangle {
                             required property var modelData
                             required property int index
 
-                            width: 352 / 3; height: 32
+                            width: 352 / 2
+                            height: 32
                             color: root.activeTab === index ? c.bg2 : tabMa.containsMouse ? c.bg2 : "transparent"
 
                             Rectangle {
@@ -83,6 +83,7 @@ PanelWindow {
                                 height: 2
                                 color: root.activeTab === index ? c.accent : "transparent"
                             }
+
                             Rectangle {
                                 visible: index === 0
                                 anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
@@ -97,13 +98,11 @@ PanelWindow {
                             Row {
                                 anchors.centerIn: parent; spacing: 6
                                 Text {
-                                    anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.icon
                                     font { family: gwnce.name; pixelSize: 12 }
                                     color: root.activeTab === index ? c.accent : c.fg2
                                 }
                                 Text {
-                                    anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.label
                                     font { pixelSize: 10; family: "JetBrains Mono Nerd Font" }
                                     color: root.activeTab === index ? c.accent : c.fg2
@@ -122,7 +121,6 @@ PanelWindow {
                 }
             }
 
-            // DND row
             Rectangle {
                 Layout.fillWidth: true; height: 32
                 color: c.bg1
@@ -132,11 +130,13 @@ PanelWindow {
                     height: 1
                     color: c.bg3
                 }
+
                 Rectangle {
                     anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
                     width: 1
                     color: c.bg3
                 }
+
                 Rectangle {
                     anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
                     width: 1
@@ -158,6 +158,7 @@ PanelWindow {
                         color: c.fg0
                         Layout.fillWidth: true
                     }
+
                     Rectangle {
                         id: dndTrack
                         width: 32; height: 18
@@ -203,13 +204,6 @@ PanelWindow {
                 Layout.margins: 16
                 visible: root.activeTab === root.tabWallpaper
                 c: root.c; g: root.g
-            }
-
-            WeekSchedule {
-                Layout.fillWidth: true
-                Layout.margins: 16
-                visible: root.activeTab === root.tabSchedule
-                c: root.c
             }
         }
     }

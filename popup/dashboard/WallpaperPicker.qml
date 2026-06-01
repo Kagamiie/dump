@@ -18,6 +18,9 @@ ColumnLayout {
 
     Component.onCompleted: _listProc.running = true
 
+    // ---------------------------------------------------------------------------
+    // Liste les wallpapers du répertoire configuré
+    // ---------------------------------------------------------------------------
     Process {
         id: _listProc
         command: ["find", Config.wallpapersDir, "-maxdepth", "1", "-type", "f",
@@ -29,24 +32,34 @@ ColumnLayout {
             onRead: line => { const t = line.trim(); if (t) buf.push(t) }
         }
         onRunningChanged: { if (running) stdout.buf = [] }
-        onExited: { wallpapers = stdout.buf.slice().sort() }
+        onExited: code => {
+            if (code !== 0) {
+                console.warn("WallpaperPicker: find failed with code", code)
+                return
+            }
+            wallpapers = stdout.buf.slice().sort()
+        }
     }
 
-    // FIX DEFINITIF : le vrai problème était que running était déjà `false`
-    // quand on tentait de le remettre à `true` — QML ne déclenche rien si
-    // la valeur ne change pas (false -> false = no-op).
-    //
-    // Solution : on ne touche JAMAIS à running depuis QML.
-    // On utilise un script bash qui tourne en boucle infinie et lit
-    // les chemins depuis stdin via un named pipe (FIFO).
-    // QML écrit dans le pipe — le script tue l'ancien swaybg et lance le nouveau.
-    // Un seul Process QML, toujours running=true, jamais relancé.
+    // ---------------------------------------------------------------------------
+    // Daemon swaybg : tourne en permanence, lit les chemins depuis un FIFO.
+    // Le FIFO est dans XDG_RUNTIME_DIR pour éviter les collisions /tmp et les
+    // attaques symlink sur un système multi-utilisateur.
+    // ---------------------------------------------------------------------------
+    property int _daemonFailCount: 0
+
+    property var _daemonBackoffTimer: Timer {
+        id: _daemonBackoffTimer
+        repeat: false
+        onTriggered: _daemonProc.running = true
+    }
 
     Process {
         id: _daemonProc
-        // Démarre le daemon wallpaper : crée le pipe, boucle sur les chemins reçus
+        // IMPORTANT : le chemin du FIFO doit être identique dans _writeProc.
+        // On utilise XDG_RUNTIME_DIR (propre à la session utilisateur, pas de collision).
         command: ["bash", "-c",
-            "PIPE=/tmp/qs_wall_pipe; " +
+            "PIPE=\"${XDG_RUNTIME_DIR:-/tmp}/qs_wall_pipe\"; " +
             "rm -f \"$PIPE\"; " +
             "mkfifo \"$PIPE\"; " +
             "trap 'pkill -x swaybg 2>/dev/null; rm -f \"$PIPE\"' EXIT; " +
@@ -58,35 +71,71 @@ ColumnLayout {
             "done"
         ]
         running: true
+
         onRunningChanged: {
-            if (!running) {
-                console.warn("WallpaperPicker: daemon died, restarting")
-                Qt.callLater(() => running = true)
+            if (running) {
+                // Réinitialiser le compteur d'échecs dès qu'il tourne
+                _daemonFailCount = 0
+                return
+            }
+            if (_daemonFailCount >= 5) {
+                console.error("WallpaperPicker: daemon failed 5 times, giving up")
+                return
+            }
+            _daemonFailCount++
+            const delay = Math.min(30000, 500 * Math.pow(2, _daemonFailCount))
+            console.warn("WallpaperPicker: daemon died, restart #" + _daemonFailCount
+                         + " in " + delay + "ms")
+            _daemonBackoffTimer.interval = delay
+            _daemonBackoffTimer.restart()
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Écriture dans le FIFO.
+    // On utilise printf + tableau d'arguments pour éviter toute injection shell
+    // (un chemin contenant des apostrophes, des espaces, des $... est géré
+    //  correctement car "$1" est expansé par bash sans être interprété comme code).
+    // La file d'attente _pendingPath garantit qu'un seul write est actif à la fois
+    // (évite la race condition si setWallpaper() est appelé rapidement).
+    // ---------------------------------------------------------------------------
+    property string _pendingPath: ""
+
+    Process {
+        id: _writeProc
+        property string path: ""
+        // "$1" reçoit `path` comme argument positionnel — aucune injection possible.
+        command: ["bash", "-c",
+            "printf '%s\\n' \"$1\" > \"${XDG_RUNTIME_DIR:-/tmp}/qs_wall_pipe\"",
+            "--", path]
+
+        onExited: code => {
+            if (code !== 0)
+                console.warn("WallpaperPicker: pipe write failed, code:", code)
+            // Envoyer le chemin suivant s'il y en a un en attente
+            if (_pendingPath !== "") {
+                path = _pendingPath
+                _pendingPath = ""
+                running = true
             }
         }
     }
 
-    // Process qui écrit un chemin dans le pipe — court, se termine immédiatement
-    Process {
-        id: _writeProc
-        property string path: ""
-        command: ["bash", "-c", "echo '" + path + "' > /tmp/qs_wall_pipe"]
-        onExited: code => {
-            if (code !== 0)
-                console.warn("WallpaperPicker: write to pipe failed, code", code)
+    function setWallpaper(wallPath) {
+        if (wallPath === _activeWallPath) return
+        _activeWallPath = wallPath
+        if (_writeProc.running) {
+            // Un write est déjà en cours : mettre en file d'attente
+            _pendingPath = wallPath
+        } else {
+            _writeProc.path = wallPath
+            _writeProc.running = true
         }
     }
 
-    function setWallpaper(path) {
-        if (path === _activeWallPath) return
-        _activeWallPath  = path
-        _writeProc.path  = path
-        // FIX : forcer running true->false->true même si déjà false
-        // en passant explicitement par false d'abord via Qt.callLater
-        _writeProc.running = false
-        Qt.callLater(() => { _writeProc.running = true })
-    }
-
+    // ---------------------------------------------------------------------------
+    // UI
+    // ---------------------------------------------------------------------------
     RowLayout {
         Layout.fillWidth: true
 
