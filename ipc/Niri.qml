@@ -22,9 +22,6 @@ Item {
                 .filter(ws => !root.screen || ws.output === root.screen.name)
                 .sort((a, b) => a.idx - b.idx)
 
-            // Les windows doivent être re-filtrées quand les workspaces changent,
-            // car le set d'IDs locaux a potentiellement changé.
-            // Utiliser Qt.callLater pour éviter la race condition
             Qt.callLater(() => {
                 winProc.running = true
             })
@@ -35,16 +32,11 @@ Item {
 
     function parseWindows(text) {
         try {
-            // Filtrer les windows pour ne garder que celles sur les workspaces
-            // de cet écran. Sans ça, un setup multi-monitor affiche toutes les
-            // fenêtres de tous les écrans dans chaque barre.
             const localWsIds = new Set(root.workspaces.map(ws => ws.id))
 
             root.windows = JSON.parse(text)
                 .filter(w => {
-                    // Si pas de screen configuré, on prend tout (mode single-monitor)
                     if (!root.screen) return true
-                    // Niri expose workspace_id sur chaque window
                     return localWsIds.has(w.workspace_id)
                 })
                 .map(w => ({

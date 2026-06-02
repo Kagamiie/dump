@@ -27,13 +27,11 @@ QtObject {
                     return
                 }
 
-                // Backoff exponentiel: 2s, 4s, 8s, 16s, 32s
                 const delay = Math.min(60000, 1000 * Math.pow(2, _subscribeRestartAttempts))
                 console.warn(`AudioService: pactl subscribe died, restarting (attempt ${_subscribeRestartAttempts}/${_maxSubscribeRestarts}) in ${delay}ms`)
                 _subscribeRestartTimer.interval = delay
                 _subscribeRestartTimer.start()
             } else {
-                // Succès - réinitialiser le compteur
                 _subscribeRestartAttempts = 0
             }
         }

@@ -47,7 +47,6 @@ Item {
             return
         }
 
-        // Une seule passe au lieu de deux
         const starts = []
         const contains = []
         for (let i = 0; i < root.apps.length; i++) {
@@ -61,7 +60,7 @@ Item {
 
     property var _nixTimer: Timer {
         id: nixTimer
-        interval: 500  // Debounce de 500ms
+        interval: 500
         repeat: false
         onTriggered: _doNixSearch()
     }
@@ -151,7 +150,7 @@ Item {
             root.nixLoading = true
             root.nixResults = []
             root.nixStatus  = ""
-            nixTimer.restart()  // Redémarrer le timer, pas relancer immédiatement
+            nixTimer.restart()
         }
     }
 }

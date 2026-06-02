@@ -29,12 +29,17 @@ Item {
 
     Component.onCompleted: _buildDateLabel()
 
+    Component.onDestruction: {
+        _midnightTimer.stop()
+    }
+
     Timer {
         id: _midnightTimer
         interval: {
             const now = new Date()
             const midnight = new Date(now)
-            midnight.setHours(24, 0, 0, 0)
+            midnight.setDate(midnight.getDate() + 1)
+            midnight.setHours(0, 0, 0, 0)
             return midnight - now
         }
         repeat: false

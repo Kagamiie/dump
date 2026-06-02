@@ -8,21 +8,17 @@ QtObject {
     property var btList: []
     property var btScanList: []
     property bool btScanning: false
+    property bool _refreshing: false
+
+    // cache mac -> device
+    property var _cache: ({})
+    property var _scanCache: ({})
 
     signal listRefreshed()
 
-    function pair(mac) {
-        btPairProc.mac = mac
-        btPairProc.running = true
-    }
-
-    function scan() {
-        btScanning = true
-        btScanList = []
-        btScanStartProc.running = true
-    }
-
     function refreshList() {
+        if (_refreshing || btListProc.running)
+            return
         btListProc.running = true
     }
 
@@ -41,37 +37,40 @@ QtObject {
         btUnpairProc.running = true
     }
 
+    function scan() {
+        btScanning = true
+        btScanList = []
+        _scanCache = {}
+        btScanStartProc.running = true
+    }
+
     property var pollTimer: Timer {
-        interval: 5000
+        interval: 20000
         repeat: true
         running: true
         triggeredOnStart: true
-        onTriggered: btListProc.running = true
+        onTriggered: root.refreshList()
     }
 
     property var btScanTimer: Timer {
-        interval: 8000
+        interval: 10000
         repeat: false
         onTriggered: btScanPollProc.running = true
     }
 
     property var btScanStartProc: Process {
-        id: btScanStartProc
         command: ["bluetoothctl", "scan", "on"]
         onExited: btScanTimer.restart()
     }
 
     property var btScanStopProc: Process {
-        id: btScanStopProc
         command: ["bluetoothctl", "scan", "off"]
     }
 
     property var btScanPollProc: Process {
-        id: btScanPollProc
         command: ["bash", "-c", `
             bluetoothctl devices | while read _ mac rest; do
                 info=$(bluetoothctl info "$mac" 2>/dev/null)
-
                 name=$(echo "$info" | grep "Name:" | sed 's/.*Name: //')
                 [ -z "$name" ] && continue
 
@@ -92,14 +91,18 @@ QtObject {
 
                 const mac = parts[0].trim()
 
-                if (buf.some(d => d.mac === mac)) return
+                if (_scanCache[mac])
+                    return
 
-                buf.push({
+                const device = {
                     mac,
                     name: parts[1].trim(),
                     connected: parts[2] === "1",
                     paired: parts[3] === "1"
-                })
+                }
+
+                _scanCache[mac] = device
+                buf.push(device)
             }
         }
 
@@ -115,7 +118,6 @@ QtObject {
     }
 
     property var btListProc: Process {
-        id: btListProc
         command: ["bash", "-c", `
             connected=$(bluetoothctl devices Connected | awk '{print $2}')
 
@@ -139,58 +141,59 @@ QtObject {
                 const parts = line.trim().split("|")
                 if (parts.length < 3) return
 
+                const mac = parts[0].trim()
                 const name = parts[1].trim()
                 if (!name) return
 
-                buf.push({
-                    mac: parts[0].trim(),
-                    name,
-                    connected: parts[2].trim() === "1"
-                })
+                const connected = parts[2].trim() === "1"
+
+                const prev = _cache[mac]
+                if (prev && prev.name === name && prev.connected === connected) {
+                    buf.push(prev)
+                    return
+                }
+
+                const device = { mac, name, connected }
+                _cache[mac] = device
+                buf.push(device)
             }
         }
 
         onRunningChanged: {
-            if (running) buf.buf = []
-            else {
+            if (running) {
+                _refreshing = true
+                stdout.buf = []
+            } else {
                 root.btList = stdout.buf.slice()
+                _refreshing = false
                 root.listRefreshed()
             }
         }
     }
 
     property var btConnectProc: Process {
-        id: btConnectProc
         property string mac: ""
         command: ["bluetoothctl", "connect", mac]
-        onExited: btListProc.running = true
+        onExited: root.refreshList()
     }
 
     property var btDisconnectProc: Process {
-        id: btDisconnectProc
         property string mac: ""
         command: ["bluetoothctl", "disconnect", mac]
-        onExited: btListProc.running = true
+        onExited: root.refreshList()
     }
 
     property var btUnpairProc: Process {
-        id: btUnpairProc
         property string mac: ""
         command: ["bluetoothctl", "remove", mac]
-        onExited: btListProc.running = true
+        onExited: root.refreshList()
     }
 
     property var btPairProc: Process {
-        id: btPairProc
         property string mac: ""
         property string commandStr: ""
 
-        command: {
-            if (commandStr) {
-                return ["bash", "-c", commandStr]
-            }
-            return []
-        }
+        command: mac ? ["bash", "-c", commandStr] : []
 
         onMacChanged: {
             commandStr = "bluetoothctl pair " + mac + " && bluetoothctl trust " + mac
@@ -203,9 +206,8 @@ QtObject {
     }
 
     property var btPairConnectProc: Process {
-        id: btPairConnectProc
         property string mac: ""
         command: ["bluetoothctl", "connect", mac]
-        onExited: btListProc.running = true
+        onExited: root.refreshList()
     }
 }

@@ -192,7 +192,6 @@ Rectangle {
             onNext: root.pairedPage++
         }
 
-        // Section new device
         Rectangle {
             visible: root.newDevices.length > 0
             width: parent.width; height: 24

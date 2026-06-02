@@ -27,11 +27,9 @@ Item {
         if (_dismissing) return
         _dismissing = true
 
-        // Arrêter immédiatement l'animation
         progressAnim.stop()
         progressFill.width = 0
 
-        // Émettre le signal
         dismissed()
     }
 
@@ -100,19 +98,17 @@ Item {
                         anchors.centerIn: parent
                         width: 36; height: 36
                         source: {
-                            // Whitelist des sources sûres
                             let imageSource = ""
 
-                            // Autoriser les URLs HTTPS
                             if (root.notifImage.startsWith("https://")) {
                                 imageSource = root.notifImage
                             }
-                            // Autoriser les ressources system icons
+
                             else if (root.notifAppIcon.startsWith("/usr/share/icons/") ||
                                      root.notifAppIcon.startsWith("/usr/share/pixmaps/")) {
                                 imageSource = "file://" + root.notifAppIcon
                             }
-                            // Autoriser les icon:// protocol (système)
+
                             else if (root.notifAppIcon && !root.notifAppIcon.startsWith("/")) {
                                 imageSource = "image://icon/" + root.notifAppIcon.toLowerCase()
                             }

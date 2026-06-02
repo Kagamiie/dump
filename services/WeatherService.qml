@@ -34,7 +34,6 @@ QtObject {
                 try {
                     const parsed = JSON.parse(this.text)
 
-                    // Validation basique de la structure
                     if (!parsed.current_condition || !Array.isArray(parsed.current_condition) ||
                         parsed.current_condition.length === 0) {
                         console.warn("WeatherService: invalid weather data structure")
