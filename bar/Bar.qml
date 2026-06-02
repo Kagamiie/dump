@@ -32,11 +32,7 @@ Item {
             Layout.fillWidth: false
             Workspaces { screen: bar.screen; c: bar.c; ipc: ipc }
             Item { width: 8 }
-            Rectangle {
-                Layout.preferredWidth: 1
-                Layout.fillHeight: true
-                color: c.bg3
-            }
+
             SearchBtn { c: bar.c; g: bar.g; launcher: bar.appLauncher }
             Item { width: 8 }
         }
