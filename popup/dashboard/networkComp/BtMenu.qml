@@ -259,7 +259,11 @@ Rectangle {
                         }
                     }
 
-                    BtButton { c: root.c; label: "Pair"; onClicked: root.pair(modelData.mac) }
+                    BtButton {
+                        c: root.c
+                        label: "Pair"
+                        onClicked: root.pair(modelData.mac)
+                    }
                 }
 
                 MouseArea {
