@@ -18,18 +18,19 @@ ColumnLayout {
 
     Component.onCompleted: _listProc.running = true
 
-    // ---------------------------------------------------------------------------
-    // Liste les wallpapers du répertoire configuré
-    // ---------------------------------------------------------------------------
     Process {
         id: _listProc
-        command: ["find", Config.wallpapersDir, "-maxdepth", "1", "-type", "f",
+        command: ["find", Quickshell.env("HOME") ?? "/home/user", "-path", "*/.cache", "-prune", "-o",
+                  "-maxdepth", "3", "-type", "f",
                   "(", "-iname", "*.jpg",  "-o", "-iname", "*.jpeg",
-                  "-o", "-iname", "*.png", "-o", "-iname", "*.webp", ")"]
+                  "-o", "-iname", "*.png", "-o", "-iname", "*.webp", ")", "-print"]
         stdout: SplitParser {
             splitMarker: "\n"
             property var buf: []
-            onRead: line => { const t = line.trim(); if (t) buf.push(t) }
+            onRead: line => {
+                const t = line.trim()
+                if (t) buf.push(t)
+            }
         }
         onRunningChanged: { if (running) stdout.buf = [] }
         onExited: code => {
@@ -41,11 +42,6 @@ ColumnLayout {
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Daemon swaybg : tourne en permanence, lit les chemins depuis un FIFO.
-    // Le FIFO est dans XDG_RUNTIME_DIR pour éviter les collisions /tmp et les
-    // attaques symlink sur un système multi-utilisateur.
-    // ---------------------------------------------------------------------------
     property int _daemonFailCount: 0
 
     property var _daemonBackoffTimer: Timer {
@@ -56,13 +52,11 @@ ColumnLayout {
 
     Process {
         id: _daemonProc
-        // IMPORTANT : le chemin du FIFO doit être identique dans _writeProc.
-        // On utilise XDG_RUNTIME_DIR (propre à la session utilisateur, pas de collision).
         command: ["bash", "-c",
-            "PIPE=\"${XDG_RUNTIME_DIR:-/tmp}/qs_wall_pipe\"; " +
-            "rm -f \"$PIPE\"; " +
-            "mkfifo \"$PIPE\"; " +
+            "PIPE=\"${XDG_RUNTIME_DIR:-/tmp}/qs_wall_pipe_$$\"; " +  // Include PID
             "trap 'pkill -x swaybg 2>/dev/null; rm -f \"$PIPE\"' EXIT; " +
+            "[ -e \"$PIPE\" ] && { echo >&2 'FIFO already exists'; exit 1; }; " +
+            "mkfifo \"$PIPE\" || { echo >&2 'Failed to create FIFO'; exit 1; }; " +
             "while IFS= read -r path < \"$PIPE\"; do " +
             "  [ -z \"$path\" ] && continue; " +
             "  pkill -x swaybg 2>/dev/null; " +
@@ -74,7 +68,6 @@ ColumnLayout {
 
         onRunningChanged: {
             if (running) {
-                // Réinitialiser le compteur d'échecs dès qu'il tourne
                 _daemonFailCount = 0
                 return
             }
@@ -91,28 +84,18 @@ ColumnLayout {
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Écriture dans le FIFO.
-    // On utilise printf + tableau d'arguments pour éviter toute injection shell
-    // (un chemin contenant des apostrophes, des espaces, des $... est géré
-    //  correctement car "$1" est expansé par bash sans être interprété comme code).
-    // La file d'attente _pendingPath garantit qu'un seul write est actif à la fois
-    // (évite la race condition si setWallpaper() est appelé rapidement).
-    // ---------------------------------------------------------------------------
     property string _pendingPath: ""
 
     Process {
         id: _writeProc
         property string path: ""
-        // "$1" reçoit `path` comme argument positionnel — aucune injection possible.
         command: ["bash", "-c",
-            "printf '%s\\n' \"$1\" > \"${XDG_RUNTIME_DIR:-/tmp}/qs_wall_pipe\"",
+            "printf '%s\\n' \"$1\" > \"${XDG_RUNTIME_DIR:-/tmp}/qs_wall_pipe_$$\"",
             "--", path]
 
         onExited: code => {
             if (code !== 0)
                 console.warn("WallpaperPicker: pipe write failed, code:", code)
-            // Envoyer le chemin suivant s'il y en a un en attente
             if (_pendingPath !== "") {
                 path = _pendingPath
                 _pendingPath = ""
@@ -125,7 +108,6 @@ ColumnLayout {
         if (wallPath === _activeWallPath) return
         _activeWallPath = wallPath
         if (_writeProc.running) {
-            // Un write est déjà en cours : mettre en file d'attente
             _pendingPath = wallPath
         } else {
             _writeProc.path = wallPath
@@ -133,9 +115,6 @@ ColumnLayout {
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // UI
-    // ---------------------------------------------------------------------------
     RowLayout {
         Layout.fillWidth: true
 

@@ -46,7 +46,8 @@ Item {
             root.filtered = root.apps.slice()
             return
         }
-        // Une seule passe au lieu de deux — évite O(2n) à chaque frappe.
+
+        // Une seule passe au lieu de deux
         const starts = []
         const contains = []
         for (let i = 0; i < root.apps.length; i++) {
@@ -60,7 +61,8 @@ Item {
 
     property var _nixTimer: Timer {
         id: nixTimer
-        interval: 400
+        interval: 500  // Debounce de 500ms
+        repeat: false
         onTriggered: _doNixSearch()
     }
 
@@ -149,7 +151,7 @@ Item {
             root.nixLoading = true
             root.nixResults = []
             root.nixStatus  = ""
-            nixTimer.restart()
+            nixTimer.restart()  // Redémarrer le timer, pas relancer immédiatement
         }
     }
 }

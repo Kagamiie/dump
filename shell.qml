@@ -19,7 +19,16 @@ ShellRoot {
     property Glyphs g: Glyphs {}
     property bool dnd: false
 
-    FontLoader { id: gwnce; source: "/home/ks/.local/share/fonts/gwnce.ttf" }
+    FontLoader {
+        id: gwnce
+        source: "file://" + (Quickshell.env("HOME") ?? "/home/user") + "/.local/share/fonts/gwnce.ttf"
+
+        onStatusChanged: {
+            if (status === FontLoader.Error) {
+                console.error("Failed to load gwnce font, will use system default for glyphs")
+            }
+        }
+    }
 
     QtObject {
         id: rightPanels

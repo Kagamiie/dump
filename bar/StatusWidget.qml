@@ -21,7 +21,7 @@ Item {
     Process {
         id: _batDiscoverProc
         command: ["sh", "-c",
-            "ls /sys/class/power_supply/ | grep -E '^BAT' | head -1"]
+            "ls /sys/class/power_supply/ 2>/dev/null | grep -E '^BAT' | head -1"]
         running: true
         stdout: SplitParser {
             splitMarker: "\n"
@@ -29,27 +29,38 @@ Item {
                 const name = line.trim()
                 if (name) {
                     _batPath = "/sys/class/power_supply/" + name
-
-                    if (_batPath !== "") {
+                    // Relancer immédiatement après avoir découvert le path
+                    Qt.callLater(() => {
                         batProc.running = true
                         _batPollTimer.running = true
-                    }                }
+                    })
+                }
             }
         }
     }
 
     Timer {
         id: _batPollTimer
-        interval: 30000; repeat: true; running: false; triggeredOnStart: false
-        onTriggered: { if (_batPath !== "") batProc.running = true }
+        interval: 30000
+        repeat: true
+        running: false
+        triggeredOnStart: false
+        onTriggered: {
+            if (_batPath !== "") {
+                batProc.running = true
+            }
+        }
     }
 
     Process {
         id: batProc
-        command: ["sh", "-c",
-            "[ -f '" + _batPath + "/capacity' ] && " +
-            "echo $(cat '" + _batPath + "/capacity') $(cat '" + _batPath + "/status') || " +
-            "echo '0 Unknown'"]
+        // Directement utiliser _batPath au lieu d'une propriété intermédiaire
+        command: ["bash", "-c",
+            "[ -f \"$1/capacity\" ] && " +
+            "{ echo \"$(cat \"$1/capacity\") $(cat \"$1/status\")\"; } || " +
+            "echo '0 Unknown'",
+            "--", _batPath]
+
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
@@ -57,17 +68,16 @@ Item {
                 if (parts.length >= 2) {
                     percent = parseInt(parts[0]) || 0
                     status  = parts[1]
+                } else if (parts[0] === "0") {
+                    percent = 0
+                    status = "Unknown"
                 }
             }
         }
-    }
 
-    Connections {
-        target: parent
-        function on_BatPathChanged() {
-            if (_batPath !== "") {
-                batProc.running = true
-                _batPollTimer.running = true
+        onExited: code => {
+            if (code !== 0 && _batPath !== "") {
+                console.warn("StatusWidget: battery read failed, code:", code)
             }
         }
     }

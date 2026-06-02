@@ -12,7 +12,6 @@ QtObject {
     signal listRefreshed()
 
     function pair(mac) {
-        console.log("PAIR FN CALLED", mac)
         btPairProc.mac = mac
         btPairProc.running = true
     }
@@ -25,6 +24,21 @@ QtObject {
 
     function refreshList() {
         btListProc.running = true
+    }
+
+    function connectDevice(mac) {
+        btConnectProc.mac = mac
+        btConnectProc.running = true
+    }
+
+    function disconnectDevice(mac) {
+        btDisconnectProc.mac = mac
+        btDisconnectProc.running = true
+    }
+
+    function unpair(mac) {
+        btUnpairProc.mac = mac
+        btUnpairProc.running = true
     }
 
     property var pollTimer: Timer {
@@ -137,7 +151,7 @@ QtObject {
         }
 
         onRunningChanged: {
-            if (running) stdout.buf = []
+            if (running) buf.buf = []
             else {
                 root.btList = stdout.buf.slice()
                 root.listRefreshed()
@@ -169,21 +183,20 @@ QtObject {
     property var btPairProc: Process {
         id: btPairProc
         property string mac: ""
-        property string command_str: ""
+        property string commandStr: ""
 
         command: {
-            if (command_str) {
-                return ["bash", "-c", command_str]
+            if (commandStr) {
+                return ["bash", "-c", commandStr]
             }
             return []
         }
 
         onMacChanged: {
-            command_str = "bluetoothctl pair " + mac + " && bluetoothctl trust " + mac
+            commandStr = "bluetoothctl pair " + mac + " && bluetoothctl trust " + mac
         }
 
         onExited: {
-            console.log("Pair process exited with code:", exitCode)
             btPairConnectProc.mac = mac
             btPairConnectProc.running = true
         }

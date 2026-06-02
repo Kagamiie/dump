@@ -15,7 +15,10 @@ Item {
 
     Niri { id: ipc; screen: bar.screen }
 
-    property string avatarSource: "file://" + Config.avatarPath
+    property string avatarSource: {
+        const path = "file://" + Config.avatarPath
+        return path
+    }
 
     Rectangle { anchors.fill: parent; color: c.bg0 }
     Rectangle {
@@ -78,6 +81,7 @@ Item {
                     anchors.fill: parent
                     source: bar.avatarSource
                     fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
                 }
                 MouseArea {
                     anchors.fill: parent

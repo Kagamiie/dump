@@ -27,8 +27,26 @@ PanelWindow {
 
     function showAt(anchor) {
         const pos = anchor.mapToGlobal(0, anchor.height)
-        offsetX = pos.x - 352 + anchor.width
-        offsetY = pos.y - 20
+        const dashboardWidth = 352
+        const dashboardHeight = mainCol.implicitHeight + 2
+
+        // Vérifier les bounds pour ne pas sortir de l'écran
+        let x = pos.x - dashboardWidth + anchor.width
+        let y = pos.y - 20
+
+        // Garder à l'intérieur de l'écran
+        if (x + dashboardWidth > parent.width) {
+            x = Math.max(0, parent.width - dashboardWidth - 10)
+        }
+        if (x < 0) x = 10
+
+        if (y + dashboardHeight > parent.height) {
+            y = Math.max(0, parent.height - dashboardHeight - 10)
+        }
+        if (y < 0) y = 10
+
+        offsetX = x
+        offsetY = y
         visible = true
     }
 

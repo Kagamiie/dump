@@ -21,14 +21,17 @@ Item {
     implicitHeight: card.implicitHeight
 
     property bool _hovered:    false
-    // Guard contre le double-dismiss (clic + timeout au même tick, ou
-    // animation terminée pendant qu'un clic est en cours de traitement).
     property bool _dismissing: false
 
-    // Point d'entrée unique pour tout dismiss — jamais appeler dismissed() directement.
     function _dismiss() {
         if (_dismissing) return
         _dismissing = true
+
+        // Arrêter immédiatement l'animation
+        progressAnim.stop()
+        progressFill.width = 0
+
+        // Émettre le signal
         dismissed()
     }
 
@@ -50,7 +53,11 @@ Item {
         to: 320
         duration: notifTimeout * 1000
         running: false
-        onFinished: root._dismiss()
+        onFinished: {
+            if (!root._dismissing) {
+                root._dismiss()
+            }
+        }
     }
 
     on_HoveredChanged: _hovered ? progressAnim.pause() : progressAnim.resume()
@@ -60,7 +67,11 @@ Item {
         hoverEnabled: true
         onEntered: root._hovered = true
         onExited:  root._hovered = false
-        onClicked: root._dismiss()
+        onClicked: {
+            if (!root._dismissing) {
+                root._dismiss()
+            }
+        }
         propagateComposedEvents: true
     }
 
@@ -89,16 +100,28 @@ Item {
                         anchors.centerIn: parent
                         width: 36; height: 36
                         source: {
-                            if (notifImage !== "")
-                                return notifImage
-                            if (notifAppIcon.startsWith("file://"))
-                                return decodeURIComponent(notifAppIcon)
-                            if (notifAppIcon !== "")
-                                return "image://icon/" + notifAppIcon.toLowerCase()
-                            return ""
+                            // Whitelist des sources sûres
+                            let imageSource = ""
+
+                            // Autoriser les URLs HTTPS
+                            if (root.notifImage.startsWith("https://")) {
+                                imageSource = root.notifImage
+                            }
+                            // Autoriser les ressources system icons
+                            else if (root.notifAppIcon.startsWith("/usr/share/icons/") ||
+                                     root.notifAppIcon.startsWith("/usr/share/pixmaps/")) {
+                                imageSource = "file://" + root.notifAppIcon
+                            }
+                            // Autoriser les icon:// protocol (système)
+                            else if (root.notifAppIcon && !root.notifAppIcon.startsWith("/")) {
+                                imageSource = "image://icon/" + root.notifAppIcon.toLowerCase()
+                            }
+
+                            return imageSource
                         }
-                        visible: notifImage !== "" || notifAppIcon !== ""
+                        visible: source !== ""
                         fillMode: Image.PreserveAspectFit
+                        asynchronous: true
                     }
 
                     Image {
@@ -107,7 +130,7 @@ Item {
                         source: Qt.resolvedUrl("../../assets/notif/default.png")
                         fillMode: Image.PreserveAspectFit
                         smooth: true; mipmap: true
-                        visible: notifImage === "" && notifAppIcon === ""
+                        visible: parent.children[0].source === ""
                     }
 
                     Rectangle {
@@ -171,11 +194,12 @@ Item {
                     Text {
                         Layout.fillWidth: true
                         Layout.margins: 10
-                        text: notifBody
+                        text: notifBody.length > 500 ? notifBody.substring(0, 500) + "..." : notifBody
                         font { pixelSize: 11; family: "JetBrains Mono Nerd Font" }
                         color: root.c ? root.c.fg1 : "#d4d4d4"
                         wrapMode: Text.WrapAnywhere
                         visible: notifBody !== ""
+                        maximumLineCount: 5
                     }
 
                     ColumnLayout {
@@ -225,8 +249,10 @@ Item {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            modelData.invoke()
-                                            root._dismiss()
+                                            if (!root._dismissing) {
+                                                modelData.invoke()
+                                                root._dismiss()
+                                            }
                                         }
                                     }
                                 }

@@ -21,9 +21,13 @@ Item {
                 }))
                 .filter(ws => !root.screen || ws.output === root.screen.name)
                 .sort((a, b) => a.idx - b.idx)
+
             // Les windows doivent être re-filtrées quand les workspaces changent,
             // car le set d'IDs locaux a potentiellement changé.
-            winProc.running = true
+            // Utiliser Qt.callLater pour éviter la race condition
+            Qt.callLater(() => {
+                winProc.running = true
+            })
         } catch(e) {
             console.warn("Niri: failed to parse workspaces:", e)
         }
@@ -59,12 +63,22 @@ Item {
         id: wsProc
         command: ["niri", "msg", "--json", "workspaces"]
         stdout: StdioCollector { onStreamFinished: root.parseWorkspaces(this.text) }
+        onExited: code => {
+            if (code !== 0) {
+                console.warn("Niri: workspaces query failed with code", code)
+            }
+        }
     }
 
     Process {
         id: winProc
         command: ["niri", "msg", "--json", "windows"]
         stdout: StdioCollector { onStreamFinished: root.parseWindows(this.text) }
+        onExited: code => {
+            if (code !== 0) {
+                console.warn("Niri: windows query failed with code", code)
+            }
+        }
     }
 
     Process {
@@ -98,7 +112,10 @@ Item {
         onTriggered: eventStream.running = true
     }
 
-    Component.onCompleted: { wsProc.running = true; winProc.running = true }
+    Component.onCompleted: {
+        wsProc.running = true
+        Qt.callLater(() => winProc.running = true)
+    }
 
     Process {
         id: focusWsProc
