@@ -67,21 +67,21 @@ ColumnLayout {
         id: _daemon
 
         command: ["bash", "-c", `
-PID="";
+            PID="";
 
-while true; do
-  read -r path <&0
+            while true; do
+            read -r path <&0
 
-  [ -z "$path" ] && continue
+            [ -z "$path" ] && continue
 
-  if [ -n "$PID" ]; then
-    kill "$PID" 2>/dev/null
-  fi
+            if [ -n "$PID" ]; then
+                kill "$PID" 2>/dev/null
+            fi
 
-  swaybg -i "$path" -m fill &
-  PID=$!
-done
-`]
+            swaybg -i "$path" -m fill &
+            PID=$!
+            done
+        `]
 
         running: true
     }

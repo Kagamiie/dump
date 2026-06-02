@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import "../../themes/"
+import "../../components/"
 
 Rectangle {
     required property Colors c
@@ -10,27 +11,10 @@ Rectangle {
     height: 72
     color: c.bg1
 
+    border { width: 1; color: c.bg3 }
+
     property string hostname: "moya"
     property string uptimeText: "up since ..."
-
-    Rectangle {
-        anchors { top: parent.top; left: parent.left; right: parent.right }
-        height: 1
-        color: c.bg3
-
-    }
-
-    Rectangle {
-        anchors { top: parent.top; bottom: parent.bottom; left: parent.left }
-        width: 1
-        color: c.bg3
-    }
-
-    Rectangle {
-        anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
-        width: 1
-        color: c.bg3
-    }
 
     Process {
         command: ["sh", "-c", "uname -n"]
@@ -61,7 +45,16 @@ Rectangle {
         }
     }
 
-    Process { id: powerProc; property string cmd: ""; command: ["sh", "-c", cmd] }
+    // Generic power command executor
+    property var _powerProc: Process {
+        property string cmd: ""
+        command: ["sh", "-c", cmd]
+    }
+
+    function executePowerAction(command) {
+        _powerProc.cmd = command
+        _powerProc.running = true
+    }
 
     RowLayout {
         anchors { fill: parent; margins: 16 }
@@ -97,17 +90,17 @@ Rectangle {
             spacing: 6
             Repeater {
                 model: [
-                    { icon: g.powerShutdown, cmd: "systemctl poweroff"   },
-                    { icon: g.powerReboot,   cmd: "systemctl reboot"     },
-                    { icon: g.powerSuspend,  cmd: "systemctl suspend"    },
+                    { icon: g.powerShutdown, cmd: "systemctl poweroff" },
+                    { icon: g.powerReboot,   cmd: "systemctl reboot" },
+                    { icon: g.powerSuspend,  cmd: "systemctl suspend" },
                     { icon: g.powerLogoff,   cmd: "niri msg action quit" }
                 ]
                 delegate: Rectangle {
                     required property var modelData
                     width: 22; height: 22
-                    color: c.bg2
-
+                    color: btnMa.containsMouse ? c.bg3 : c.bg2
                     border { width: 1; color: btnMa.containsMouse ? c.red : c.bg3 }
+                    Behavior on color { ColorAnimation { duration: 80 } }
 
                     Text {
                         anchors.centerIn: parent
@@ -121,7 +114,7 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { powerProc.cmd = modelData.cmd; powerProc.running = true }
+                        onClicked: executePowerAction(modelData.cmd)
                     }
                 }
             }

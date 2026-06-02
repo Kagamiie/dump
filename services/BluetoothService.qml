@@ -10,125 +10,74 @@ QtObject {
     property bool btScanning: false
     property bool _refreshing: false
 
-    // cache mac -> device
     property var _cache: ({})
     property var _scanCache: ({})
 
     signal listRefreshed()
 
     function refreshList() {
-        if (_refreshing || btListProc.running)
-            return
+        if (_refreshing || btListProc.running) return
         btListProc.running = true
     }
 
     function connectDevice(mac) {
-        btConnectProc.mac = mac
-        btConnectProc.running = true
+        _runCommand(["bluetoothctl", "connect", mac])
     }
 
     function disconnectDevice(mac) {
-        btDisconnectProc.mac = mac
-        btDisconnectProc.running = true
+        _runCommand(["bluetoothctl", "disconnect", mac])
     }
 
     function unpair(mac) {
-        btUnpairProc.mac = mac
-        btUnpairProc.running = true
+        _runCommand(["bluetoothctl", "remove", mac])
+    }
+
+    function pair(mac) {
+        _runCommand(["bluetoothctl", "pair", mac])
+        Qt.callLater(() => _runCommand(["bluetoothctl", "trust", mac]))
     }
 
     function scan() {
         btScanning = true
         btScanList = []
         _scanCache = {}
-        btScanStartProc.running = true
+        _runCommand(["bluetoothctl", "scan", "on"])
+        btScanTimer.restart()
     }
 
+    function _runCommand(cmd) {
+        _proc.command = cmd
+        _proc.running = false
+        Qt.callLater(() => _proc.running = true)
+    }
+
+    // Poll device list
     property var pollTimer: Timer {
-        interval: 20000
-        repeat: true
-        running: true
-        triggeredOnStart: true
+        interval: 20000; repeat: true; running: true; triggeredOnStart: true
         onTriggered: root.refreshList()
     }
 
+    // Scan timer
     property var btScanTimer: Timer {
-        interval: 10000
-        repeat: false
+        interval: 10000; repeat: false
         onTriggered: btScanPollProc.running = true
     }
 
-    property var btScanStartProc: Process {
-        command: ["bluetoothctl", "scan", "on"]
-        onExited: btScanTimer.restart()
+    // Generic command processor
+    property var _proc: Process {
+        onExited: root.refreshList()
     }
 
-    property var btScanStopProc: Process {
-        command: ["bluetoothctl", "scan", "off"]
-    }
-
-    property var btScanPollProc: Process {
-        command: ["bash", "-c", `
-            bluetoothctl devices | while read _ mac rest; do
-                info=$(bluetoothctl info "$mac" 2>/dev/null)
-                name=$(echo "$info" | grep "Name:" | sed 's/.*Name: //')
-                [ -z "$name" ] && continue
-
-                connected=$(echo "$info" | grep -c "Connected: yes")
-                paired=$(echo "$info" | grep -c "Paired: yes")
-
-                echo "$mac|$name|$connected|$paired"
-            done
-        `]
-
-        stdout: SplitParser {
-            splitMarker: "\n"
-            property var buf: []
-
-            onRead: line => {
-                const parts = line.trim().split("|")
-                if (parts.length !== 4) return
-
-                const mac = parts[0].trim()
-
-                if (_scanCache[mac])
-                    return
-
-                const device = {
-                    mac,
-                    name: parts[1].trim(),
-                    connected: parts[2] === "1",
-                    paired: parts[3] === "1"
-                }
-
-                _scanCache[mac] = device
-                buf.push(device)
-            }
-        }
-
-        onRunningChanged: {
-            if (running) stdout.buf = []
-        }
-
-        onExited: {
-            root.btScanning = false
-            root.btScanList = stdout.buf.slice()
-            btScanStopProc.running = true
-        }
-    }
-
+    // List paired devices
     property var btListProc: Process {
         command: ["bash", "-c", `
             connected=$(bluetoothctl devices Connected | awk '{print $2}')
-
             bluetoothctl devices Paired | while read _ mac rest; do
                 info=$(bluetoothctl info "$mac" 2>/dev/null)
                 name=$(echo "$info" | grep "Name:" | sed 's/.*Name: //')
                 [ -z "$name" ] && continue
-
                 is_connected=0
                 echo "$connected" | grep -q "$mac" && is_connected=1
-
                 echo "$mac|$name|$is_connected"
             done
         `]
@@ -146,7 +95,6 @@ QtObject {
                 if (!name) return
 
                 const connected = parts[2].trim() === "1"
-
                 const prev = _cache[mac]
                 if (prev && prev.name === name && prev.connected === connected) {
                     buf.push(prev)
@@ -171,43 +119,48 @@ QtObject {
         }
     }
 
-    property var btConnectProc: Process {
-        property string mac: ""
-        command: ["bluetoothctl", "connect", mac]
-        onExited: root.refreshList()
-    }
+    // Scan for new devices
+    property var btScanPollProc: Process {
+        command: ["bash", "-c", `
+            bluetoothctl devices | while read _ mac rest; do
+                info=$(bluetoothctl info "$mac" 2>/dev/null)
+                name=$(echo "$info" | grep "Name:" | sed 's/.*Name: //')
+                [ -z "$name" ] && continue
+                connected=$(echo "$info" | grep -c "Connected: yes")
+                paired=$(echo "$info" | grep -c "Paired: yes")
+                echo "$mac|$name|$connected|$paired"
+            done
+        `]
 
-    property var btDisconnectProc: Process {
-        property string mac: ""
-        command: ["bluetoothctl", "disconnect", mac]
-        onExited: root.refreshList()
-    }
+        stdout: SplitParser {
+            splitMarker: "\n"
+            property var buf: []
 
-    property var btUnpairProc: Process {
-        property string mac: ""
-        command: ["bluetoothctl", "remove", mac]
-        onExited: root.refreshList()
-    }
+            onRead: line => {
+                const parts = line.trim().split("|")
+                if (parts.length !== 4) return
 
-    property var btPairProc: Process {
-        property string mac: ""
-        property string commandStr: ""
+                const mac = parts[0].trim()
+                if (_scanCache[mac]) return
 
-        command: mac ? ["bash", "-c", commandStr] : []
+                const device = {
+                    mac,
+                    name: parts[1].trim(),
+                    connected: parts[2] === "1",
+                    paired: parts[3] === "1"
+                }
 
-        onMacChanged: {
-            commandStr = "bluetoothctl pair " + mac + " && bluetoothctl trust " + mac
+                _scanCache[mac] = device
+                buf.push(device)
+            }
         }
+
+        onRunningChanged: { if (running) stdout.buf = [] }
 
         onExited: {
-            btPairConnectProc.mac = mac
-            btPairConnectProc.running = true
+            root.btScanning = false
+            root.btScanList = stdout.buf.slice()
+            _runCommand(["bluetoothctl", "scan", "off"])
         }
-    }
-
-    property var btPairConnectProc: Process {
-        property string mac: ""
-        command: ["bluetoothctl", "connect", mac]
-        onExited: root.refreshList()
     }
 }

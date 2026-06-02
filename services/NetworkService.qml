@@ -18,7 +18,7 @@ QtObject {
     signal connectionSuccess()
 
     function refresh() {
-        netProc.running  = true
+        netProc.running = true
         ssidProc.running = true
     }
 
@@ -31,63 +31,62 @@ QtObject {
     }
 
     function connectKnown(profileName) {
-        connectKnownProc.profileName = profileName
-        connectKnownProc.running     = true
+        _runCommand(["nmcli", "connection", "up", profileName], true, profileName)
     }
 
     function connectNew(ssid, pass) {
-        connectNewProc.ssid    = ssid
-        connectNewProc.pass    = pass
-        connectNewProc.running = false
-        Qt.callLater(() => connectNewProc.running = true)
+        _runCommand(["nmcli", "dev", "wifi", "connect", ssid, "password", pass], true, ssid)
     }
 
     function deleteProfile(profileName) {
-        deleteKnownProc.profileName = profileName
-        deleteKnownProc.running     = true
+        _runCommand(["nmcli", "connection", "delete", profileName], false, "")
     }
 
     function switchToWifi() {
         if (ethIface === "" || wifiIface === "") return
-        _disconnectForWifiProc.iface = ethIface
-        _disconnectForWifiProc.running = false
-        Qt.callLater(() => _disconnectForWifiProc.running = true)
+        _runCommand(["nmcli", "device", "disconnect", ethIface], false, "")
+        Qt.callLater(() => _runCommand(["nmcli", "device", "connect", wifiIface], false, ""))
     }
 
     function switchToEth() {
         if (wifiIface === "" || ethIface === "") return
-        _disconnectForEthProc.iface = wifiIface
-        _disconnectForEthProc.running = false
-        Qt.callLater(() => _disconnectForEthProc.running = true)
+        _runCommand(["nmcli", "device", "disconnect", wifiIface], false, "")
+        Qt.callLater(() => _runCommand(["nmcli", "device", "connect", ethIface], false, ""))
     }
 
+    function _runCommand(cmd, emitSignal, identifier) {
+        _cmdProc.cmd = cmd
+        _cmdProc.emitSignal = emitSignal
+        _cmdProc.identifier = identifier
+        _cmdProc.running = false
+        Qt.callLater(() => _cmdProc.running = true)
+    }
+
+    // Initialization
     property var _init: Timer {
         interval: 0; repeat: false; running: true
         onTriggered: {
-            ifaceProc.running  = true
-            savedProc.running  = true
-            netProc.running    = true
-            ssidProc.running   = true
+            ifaceProc.running = true
+            savedProc.running = true
+            refresh()
         }
     }
 
+    // Network change monitor
     property var _pollFallback: Timer {
-        interval: 30000
-        repeat: true
+        interval: 30000; repeat: true
         running: !_nmcliMonitor.running
-        onTriggered: { netProc.running = true; ssidProc.running = true }
+        onTriggered: refresh()
     }
 
     property var _nmcliMonitor: Process {
-        id: _nmcliMonitor
         command: ["nmcli", "monitor"]
         running: true
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
                 if (!line.trim()) return
-                netProc.running  = true
-                ssidProc.running = true
+                refresh()
                 if (line.includes("wifi") || line.includes("wireless"))
                     wifiListProc.running = true
             }
@@ -101,31 +100,29 @@ QtObject {
     }
 
     property var _monitorRestartTimer: Timer {
-        id: _monitorRestartTimer
         interval: 3000; repeat: false
         onTriggered: _nmcliMonitor.running = true
     }
 
+    // Find network interfaces
     property var ifaceProc: Process {
-        id: ifaceProc
         command: ["sh", "-c",
             "nmcli -t -f DEVICE,TYPE device | awk -F: '$2==\"wifi\"{print $1}' | head -1; " +
-            "nmcli -t -f DEVICE,TYPE device | awk -F: '$2==\"ethernet\"{print $1}' | head -1"
-        ]
+            "nmcli -t -f DEVICE,TYPE device | awk -F: '$2==\"ethernet\"{print $1}' | head -1"]
         stdout: SplitParser {
             splitMarker: "\n"
             property int lineN: 0
             onRead: line => {
                 if (lineN === 0) root.wifiIface = line.trim()
-                else             root.ethIface  = line.trim()
+                else root.ethIface = line.trim()
                 lineN++
             }
         }
         onRunningChanged: { if (running) stdout.lineN = 0 }
     }
 
+    // Get current SSID
     property var ssidProc: Process {
-        id: ssidProc
         command: ["sh", "-c",
             "iwgetid -r 2>/dev/null || nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2"]
         stdout: StdioCollector {
@@ -133,8 +130,8 @@ QtObject {
         }
     }
 
+    // Get saved profiles
     property var savedProc: Process {
-        id: savedProc
         command: ["bash", "-c",
             "nmcli -t -f NAME,TYPE connection show | grep ':802-11-wireless$' | cut -d: -f1 | " +
             "while read name; do " +
@@ -156,35 +153,30 @@ QtObject {
         onExited: { root.savedProfiles = Object.assign({}, stdout.buf) }
     }
 
+    // Check current network connection
     property var netProc: Process {
-        id: netProc
         command: ["sh", "-c",
             "ip route get 1.1.1.1 2>/dev/null | grep -oP 'dev \\K\\S+' | head -1"]
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
                 const iface = line.trim()
-                if (!iface) {
-                    root.netName = "No connection"
-                    root.useWifi = false
-                    return
-                }
-                root.netName = iface
-                root.useWifi = iface.startsWith("w")
+                root.netName = iface || "No connection"
+                root.useWifi = iface.startsWith("w") || false
             }
         }
     }
 
+    // List WiFi networks
     property var wifiListProc: Process {
-        id: wifiListProc
         command: ["sh", "-c", "nmcli -t -f SSID,SIGNAL,ACTIVE dev wifi list 2>/dev/null"]
         stdout: SplitParser {
             splitMarker: "\n"
             property var buf: ({})
             onRead: line => {
-                const parts  = line.split(":")
+                const parts = line.split(":")
                 if (parts.length < 3) return
-                const ssid   = parts[0].trim()
+                const ssid = parts[0].trim()
                 const signal = parseInt(parts[1]) || 0
                 const active = parts[2].trim() === "yes"
                 if (!ssid) return
@@ -193,9 +185,8 @@ QtObject {
             }
         }
         onRunningChanged: {
-            if (running) {
-                stdout.buf = ({})
-            } else {
+            if (running) stdout.buf = ({})
+            else {
                 const arr = Object.values(stdout.buf)
                 arr.sort((a, b) => a.active ? -1 : b.active ? 1 : b.signal - a.signal)
                 root.netList = arr
@@ -203,60 +194,20 @@ QtObject {
         }
     }
 
-    property var connectKnownProc: Process {
-        id: connectKnownProc
-        property string profileName: ""
-        command: ["nmcli", "connection", "up", profileName]
+    // Generic command runner (replaces multiple Process)
+    property var _cmdProc: Process {
+        property var cmd: []
+        property bool emitSignal: false
+        property string identifier: ""
+
+        command: cmd
         onExited: code => {
             savedProc.running = true
-            netProc.running   = true
-            if (code !== 0) root.connectionFailed(profileName)
-            else            root.connectionSuccess()
+            netProc.running = true
+            if (emitSignal) {
+                if (code !== 0) root.connectionFailed(identifier)
+                else root.connectionSuccess()
+            }
         }
-    }
-
-    property var connectNewProc: Process {
-        id: connectNewProc
-        property string ssid: ""
-        property string pass: ""
-        command: ["nmcli", "dev", "wifi", "connect", ssid, "password", pass]
-        onExited: code => {
-            savedProc.running = true
-            netProc.running   = true
-            if (code !== 0) root.connectionFailed(ssid)
-            else            root.connectionSuccess()
-        }
-    }
-
-    property var deleteKnownProc: Process {
-        id: deleteKnownProc
-        property string profileName: ""
-        command: ["nmcli", "connection", "delete", profileName]
-    }
-
-    property var _disconnectForWifiProc: Process {
-        property string iface: ""
-        command: ["nmcli", "device", "disconnect", iface]
-        onExited: _connectWifiProc.running = true
-    }
-
-    property var _connectWifiProc: Process {
-        command: ["nmcli", "device", "connect", root.wifiIface]
-        onExited: {
-            netProc.running      = true
-            ssidProc.running     = true
-            wifiListProc.running = true
-        }
-    }
-
-    property var _disconnectForEthProc: Process {
-        property string iface: ""
-        command: ["nmcli", "device", "disconnect", iface]
-        onExited: _connectEthProc.running = true
-    }
-
-    property var _connectEthProc: Process {
-        command: ["nmcli", "device", "connect", root.ethIface]
-        onExited: netProc.running = true
     }
 }

@@ -15,24 +15,28 @@ Item {
     property bool   hoveredWeather:  false
     property string weatherIcon:     WeatherService.icon
     property string weatherTemp:     WeatherService.tempC
-    property string _dateLabel: ""
+    property string _dateLabel:      ""
 
+    // Build date string once, then use function
     function _buildDateLabel() {
         const d = new Date()
         const months = ["January","February","March","April","May","June",
                         "July","August","September","October","November","December"]
         const day = d.getDate()
-        const suf = (day > 3 && day < 21) ? "th"
-                  : ({1:"st",2:"nd",3:"rd"}[day % 10] ?? "th")
-        _dateLabel = months[d.getMonth()] + " " + day + suf
+        const dayNum = day % 10
+        const lastTwoDigits = day % 100
+
+        let suffix = "th"
+        if (lastTwoDigits < 4 || lastTwoDigits > 20) {
+            suffix = dayNum === 1 ? "st" : dayNum === 2 ? "nd" : dayNum === 3 ? "rd" : "th"
+        }
+
+        _dateLabel = months[d.getMonth()] + " " + day + suffix
     }
 
     Component.onCompleted: _buildDateLabel()
 
-    Component.onDestruction: {
-        _midnightTimer.stop()
-    }
-
+    // Midnight timer - reset date at midnight
     Timer {
         id: _midnightTimer
         interval: {
@@ -46,9 +50,8 @@ Item {
         running: true
         onTriggered: {
             clockRoot._buildDateLabel()
-
             interval = 86400000
-            repeat   = true
+            repeat = true
         }
     }
 
@@ -69,6 +72,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
 
+        // Date/Time display
         Row {
             id: dateTimeRow
             anchors.verticalCenter: parent.verticalCenter
@@ -87,7 +91,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 color: clockRoot.hoveredDateTime ? c.accent : c.fg0
                 font { pixelSize: 12; bold: true; family: "JetBrains Mono Nerd Font" }
-                text: clk.hours.toString().padStart(2,"0") + ":" + clk.minutes.toString().padStart(2,"0")
+                text: clk.hours.toString().padStart(2,"0") + ":" +
+                      clk.minutes.toString().padStart(2,"0")
             }
         }
 
@@ -96,6 +101,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
         }
 
+        // Weather display
         Row {
             id: weatherRow
             anchors.verticalCenter: parent.verticalCenter

@@ -14,14 +14,13 @@ Item {
         height: 24
         anchors.verticalCenter: parent.verticalCenter
         color: togMa.containsMouse ? c.bg2 : c.bg1
-        border.width: 1
-        border.color: c.bg3
+        border { width: 1; color: c.bg3 }
+        Behavior on color { ColorAnimation { duration: 80 } }
 
         Text {
             anchors.centerIn: parent
             text: systrayMenu.visible ? g.arrowRight : g.arrowLeft
-            font.family: gwnce.name
-            font.pixelSize: 15
+            font { family: gwnce.name; pixelSize: 15 }
             color: c.fg3
         }
 

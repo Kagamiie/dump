@@ -42,12 +42,10 @@ ShellRoot {
     IpcHandler {
         target: "shell"
         function launcher() { launcherroot.toggle() }
-        function glyphs()   { glyphPreview.toggle() }
         function dnd()      { root.dnd = !root.dnd }
     }
 
     LauncherRoot  { id: launcherroot; c: root.c }
-    GlyphsPreview { id: glyphPreview; c: root.c }
     Daemon        { id: notifDaemon;  c: root.c; dnd: root.dnd }
     DatePanel     { id: datePanel;    c: root.c; g: root.g }
     SystrayMenu   { id: systrayMenu;  c: root.c }

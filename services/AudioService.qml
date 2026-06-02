@@ -15,6 +15,7 @@ QtObject {
     property int _subscribeRestartAttempts: 0
     property int _maxSubscribeRestarts: 5
 
+    // Subscribe to audio changes
     property var subscribeProc: Process {
         command: ["pactl", "subscribe"]
         running: true
@@ -23,7 +24,7 @@ QtObject {
                 _subscribeRestartAttempts++
 
                 if (_subscribeRestartAttempts > _maxSubscribeRestarts) {
-                    console.error("AudioService: pactl subscribe failed too many times, giving up")
+                    console.error("AudioService: pactl subscribe failed too many times")
                     return
                 }
 
@@ -39,55 +40,60 @@ QtObject {
             splitMarker: "\n"
             onRead: line => {
                 if (line.includes("sink") || line.includes("server")) sinkProc.running = true
-                if (line.includes("source"))                          sourceProc.running = true
+                if (line.includes("source")) sourceProc.running = true
             }
         }
     }
 
     property var _subscribeRestartTimer: Timer {
-        id: _subscribeRestartTimer
         interval: 2000; repeat: false
         onTriggered: subscribeProc.running = true
     }
 
+    // Parse output: volume%, mute state, device name
+    function _parseSinkSource(text, isSink) {
+        const lines = text.trim().split("\n")
+        if (lines.length < 3) return
+
+        const volPercent = Math.min(100, parseInt(lines[0]) || 0)
+        const isMute = lines[1].includes("yes")
+        const deviceName = lines[2]
+
+        if (isSink) {
+            root.volume = volPercent
+            root.muted = isMute
+            root.label = deviceName.includes("Speaker") ? "Speakers"
+                       : deviceName.includes("Headphone") ? "Headphones"
+                       : "Audio Out"
+        } else {
+            root.micVol = volPercent
+            root.micMuted = isMute
+            root.micLabel = deviceName.includes("Mic") ? "Microphone"
+                          : deviceName.includes("Camera") ? "Camera Mic"
+                          : "Audio In"
+        }
+    }
+
+    // Get speaker/output device status
     property var sinkProc: Process {
-        id: sinkProc
         running: true
         command: ["sh", "-c",
             "pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -oP '\\d+(?=%)' | head -1 && " +
             "pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null && " +
             "pactl get-default-sink 2>/dev/null"]
         stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = this.text.trim().split("\n")
-                if (lines.length < 3) return
-                root.volume = Math.min(100, parseInt(lines[0]) || 0)
-                root.muted  = lines[1].includes("yes")
-                const sink  = lines[2]
-                root.label  = sink.includes("Speaker")   ? "Speakers"
-                            : sink.includes("Headphone") ? "Headphones"
-                            : "Audio Out"
-            }
+            onStreamFinished: root._parseSinkSource(this.text, true)
         }
     }
 
+    // Get microphone/input device status
     property var sourceProc: Process {
-        id: sourceProc
         command: ["sh", "-c",
             "pactl get-source-volume @DEFAULT_SOURCE@ 2>/dev/null | grep -oP '\\d+(?=%)' | head -1 && " +
             "pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null && " +
             "pactl get-default-source 2>/dev/null"]
         stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = this.text.trim().split("\n")
-                if (lines.length < 3) return
-                root.micVol   = Math.min(100, parseInt(lines[0]) || 0)
-                root.micMuted = lines[1].includes("yes")
-                const src     = lines[2]
-                root.micLabel = src.includes("Mic")    ? "Microphone"
-                              : src.includes("Camera") ? "Camera Mic"
-                              : "Audio In"
-            }
+            onStreamFinished: root._parseSinkSource(this.text, false)
         }
     }
 }

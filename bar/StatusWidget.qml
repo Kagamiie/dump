@@ -15,51 +15,41 @@ Item {
 
     property int percent: 0
     property string status: "Unknown"
-
     property string _batPath: ""
 
     onVolumeChanged: volumeOsd.show(volume, muted)
     onMutedChanged: volumeOsd.show(volume, muted)
 
+    // Discover battery device
     Process {
-        id: _batDiscoverProc
         running: true
-
         command: [
             "sh", "-c",
             "ls /sys/class/power_supply/ 2>/dev/null | grep '^BAT' | head -n 1"
         ]
-
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
                 const name = line.trim()
                 if (!name || _batPath !== "") return
-
                 _batPath = "/sys/class/power_supply/" + name
                 _batPollTimer.start()
-                batProc.running = true
+                _readBattery()
             }
         }
     }
+
+    // Poll battery periodically
     Timer {
         id: _batPollTimer
         interval: 30000
         repeat: true
         running: false
-
-        onTriggered: {
-            if (_batPath !== "" && !batProc.running)
-                batProc.running = true
-        }
+        onTriggered: _readBattery()
     }
 
-    Process {
-        id: batProc
-
-        property int _cap: 0
-        property string _st: "Unknown"
-
+    // Read battery status
+    property var _batProc: Process {
         command: _batPath === "" ? [] : [
             "bash", "-c",
             "cat \"$1/capacity\"; cat \"$1/status\"",
@@ -69,35 +59,42 @@ Item {
         stdout: SplitParser {
             splitMarker: "\n"
 
+            property int _cap: 0
+            property string _st: "Unknown"
+
             onRead: line => {
                 const v = line.trim()
 
                 if (v === "Charging" || v === "Full" || v === "Discharging") {
-                    batProc._st = v
+                    _st = v
                 } else {
                     const n = parseInt(v)
                     if (!isNaN(n))
-                        batProc._cap = n
+                        _cap = n
                 }
             }
         }
 
-        onExited: code => {
-            if (code === 0) {
-                percent = _cap
-                status = _st
-            }
+        onExited: {
+            percent = stdout._cap
+            status = stdout._st
+
+            stdout._cap = 0
+            stdout._st = "Unknown"
         }
+    }
+
+    function _readBattery() {
+        if (_batPath !== "" && !_batProc.running)
+            _batProc.running = true
     }
 
     Rectangle {
         id: box
         anchors.centerIn: parent
         height: 24
-
         color: c.bg1
         border { width: 1; color: c.bg3 }
-
         implicitWidth: row.implicitWidth + 24
 
         Row {

@@ -17,6 +17,42 @@ PanelWindow {
 
     property int mode: 0
 
+    // State
+    property string query:         ""
+    property var    apps:          []
+    property var    filtered:      []
+    property int    selectedIndex: 0
+    property int    currentPage:   0
+
+    property string nixQuery:    ""
+    property var    nixResults:  []
+    property int    nixSelected: 0
+    property bool   nixLoading:  false
+    property string nixStatus:   ""
+
+    // Layout config
+    readonly property int cols:      4
+    readonly property int rows:      3
+    readonly property int perPage:   cols * rows
+    readonly property int pageCount: Math.max(1, Math.ceil(filtered.length / perPage))
+    readonly property var pageItems: filtered.slice(currentPage * perPage, (currentPage + 1) * perPage)
+
+    onFilteredChanged: { currentPage = 0; selectedIndex = 0 }
+
+    // Reset all state
+    function resetState() {
+        query = ""
+        selectedIndex = 0
+        currentPage = 0
+        nixQuery = ""
+        nixResults = []
+        nixStatus = ""
+        nixSelected = 0
+        searchBar.clear()
+        logic.updateFilter()
+    }
+
+    // Open and initialize
     onVisibleChanged: {
         if (visible) {
             Qt.callLater(() => searchBar.searchInput.forceActiveFocus())
@@ -27,46 +63,17 @@ PanelWindow {
         visible = !visible
         if (visible) {
             mode = 0
-            query = ""
-            selectedIndex = 0
-            currentPage = 0
-            nixQuery = ""
-            nixResults = []
-            nixStatus = ""
-            nixSelected = 0
-            searchBar.clear()
-            logic.updateFilter()
+            resetState()
         }
     }
 
     function switchMode(m) {
         mode = m
-        query = ""
-        selectedIndex = 0
-        currentPage = 0
-        nixQuery = ""
-        nixResults = []
-        nixStatus = ""
-        nixSelected = 0
-        searchBar.searchInput.text = ""
-        logic.updateFilter()
+        resetState()
         Qt.callLater(() => searchBar.searchInput.forceActiveFocus())
     }
 
-    property string query:         ""
-    property var    apps:          []
-    property var    filtered:      []
-    property int    selectedIndex: 0
-    property int    currentPage:   0
-
-    readonly property int cols:      4
-    readonly property int rows:      3
-    readonly property int perPage:   cols * rows
-    readonly property int pageCount: Math.max(1, Math.ceil(filtered.length / perPage))
-    readonly property var pageItems: filtered.slice(currentPage * perPage, (currentPage + 1) * perPage)
-
-    onFilteredChanged: { currentPage = 0; selectedIndex = 0 }
-
+    // Helper for index selection
     function selectIndex(i) {
         if (i < 0) i = Math.max(0, filtered.length - 1)
         if (i >= filtered.length) i = 0
@@ -74,12 +81,6 @@ PanelWindow {
         if (page !== currentPage) currentPage = page
         selectedIndex = i
     }
-
-    property string nixQuery:    ""
-    property var    nixResults:  []
-    property int    nixSelected: 0
-    property bool   nixLoading:  false
-    property string nixStatus:   ""
 
     LauncherLogic { id: logic; root: root }
 

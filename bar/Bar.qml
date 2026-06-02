@@ -15,7 +15,7 @@ Item {
 
     Niri { id: ipc; screen: bar.screen }
 
-    property string avatarSource: "file://" + Config.avatarPath
+    property string avatarSource: Config.avatarPath ? ("file://" + Config.avatarPath) : ""
 
     Rectangle { anchors.fill: parent; color: c.bg0 }
     Rectangle {
@@ -70,11 +70,17 @@ Item {
                 width: 23; height: 23
                 Layout.alignment: Qt.AlignVCenter
                 clip: true
+                color: c.bg2
+                border { width: 1; color: c.bg3 }
+
                 Image {
+                    id: avatarImage
                     anchors.fill: parent
                     source: bar.avatarSource
                     fillMode: Image.PreserveAspectCrop
+                    visible: status === Image.Ready && source !== ""
                 }
+
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor

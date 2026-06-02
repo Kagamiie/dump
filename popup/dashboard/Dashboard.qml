@@ -53,8 +53,8 @@ PanelWindow {
             spacing: 0
 
             UserCard { Layout.fillWidth: true; c: root.c; g: root.g }
-            Rectangle { Layout.fillWidth: true; height: 1; color: c.bg3 }
 
+            // Tab bar
             Rectangle {
                 Layout.fillWidth: true
                 height: 32
@@ -121,25 +121,30 @@ PanelWindow {
                 }
             }
 
+            // DND Toggle
             Rectangle {
-                Layout.fillWidth: true; height: 32
+                Layout.fillWidth: true
+                height: 32
                 color: c.bg1
 
                 Rectangle {
-                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                    anchors.top: parent.top
+                    width: parent.width
                     height: 1
                     color: c.bg3
                 }
 
                 Rectangle {
-                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                    anchors.left: parent.left
                     width: 1
+                    height: parent.height
                     color: c.bg3
                 }
 
                 Rectangle {
-                    anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
+                    anchors.right: parent.right
                     width: 1
+                    height: parent.height
                     color: c.bg3
                 }
 
@@ -185,6 +190,7 @@ PanelWindow {
 
             Rectangle { Layout.fillWidth: true; height: 1; color: c.bg3 }
 
+            // Content panels
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.margins: 16
@@ -192,11 +198,11 @@ PanelWindow {
                 visible: root.activeTab === root.tabOverview
 
                 NetworkPanel { Layout.fillWidth: true; c: root.c; g: root.g }
-                Rectangle    { Layout.fillWidth: true; height: 1; color: c.bg3 }
-                MediaPlayer  { Layout.fillWidth: true; c: root.c; g: root.g }
+                Rectangle { Layout.fillWidth: true; height: 1; color: c.bg3 }
+                MediaPlayer { Layout.fillWidth: true; c: root.c; g: root.g }
                 AudioSliders { Layout.fillWidth: true; c: root.c; g: root.g }
-                Rectangle    { Layout.fillWidth: true; height: 1; color: c.bg3 }
-                Quote        { Layout.fillWidth: true; c: root.c }
+                Rectangle { Layout.fillWidth: true; height: 1; color: c.bg3 }
+                Quote { Layout.fillWidth: true; c: root.c }
             }
 
             WallpaperPicker {
