@@ -42,7 +42,7 @@ Item {
     // Poll battery periodically
     Timer {
         id: _batPollTimer
-        interval: 30000
+        interval: 120000
         repeat: true
         running: false
         onTriggered: _readBattery()

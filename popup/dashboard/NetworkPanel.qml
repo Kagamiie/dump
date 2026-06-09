@@ -104,11 +104,14 @@ Column {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    showNetList    = !showNetList
-                    showBtList     = false
-                    showPassInput  = false
-                    if (showNetList) NetworkService.refreshWifiList()
-                }
+                        if (!showNetList) {
+                            NetworkService.refreshWifiList()
+                        }
+                        showNetList    = !showNetList
+                        showBtList     = false
+                        showPassInput  = false
+                    }
+
             }
         }
 
@@ -159,11 +162,13 @@ Column {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    showBtList    = !showBtList
-                    showNetList   = false
-                    showPassInput = false
-                    if (showBtList) BluetoothService.refreshList()
-                }
+                        if (!showBtList) {
+                            BluetoothService.refreshList()
+                        }
+                        showBtList    = !showBtList
+                        showNetList   = false
+                        showPassInput = false
+                    }
             }
         }
     }

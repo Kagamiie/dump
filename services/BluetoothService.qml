@@ -8,15 +8,11 @@ QtObject {
     property var btList: []
     property var btScanList: []
     property bool btScanning: false
-    property bool _refreshing: false
-
-    property var _cache: ({})
-    property var _scanCache: ({})
 
     signal listRefreshed()
 
     function refreshList() {
-        if (_refreshing || btListProc.running) return
+        if (btListProc.running) return
         btListProc.running = true
     }
 
@@ -50,24 +46,24 @@ QtObject {
         Qt.callLater(() => _proc.running = true)
     }
 
-    // Poll device list
     property var pollTimer: Timer {
-        interval: 20000; repeat: true; running: true; triggeredOnStart: true
+        interval: 20000
+        repeat: true
+        running: true
+        triggeredOnStart: true
         onTriggered: root.refreshList()
     }
 
-    // Scan timer
     property var btScanTimer: Timer {
-        interval: 10000; repeat: false
+        interval: 10000
+        repeat: false
         onTriggered: btScanPollProc.running = true
     }
 
-    // Generic command processor
     property var _proc: Process {
         onExited: root.refreshList()
     }
 
-    // List paired devices
     property var btListProc: Process {
         command: ["bash", "-c", `
             connected=$(bluetoothctl devices Connected | awk '{print $2}')
@@ -94,31 +90,20 @@ QtObject {
                 if (!name) return
 
                 const connected = parts[2].trim() === "1"
-                const prev = _cache[mac]
-                if (prev && prev.name === name && prev.connected === connected) {
-                    buf.push(prev)
-                    return
-                }
-
-                const device = { mac, name, connected }
-                _cache[mac] = device
-                buf.push(device)
+                buf.push({ mac, name, connected })
             }
         }
 
         onRunningChanged: {
             if (running) {
-                _refreshing = true
                 stdout.buf = []
             } else {
                 root.btList = stdout.buf.slice()
-                _refreshing = false
                 root.listRefreshed()
             }
         }
     }
 
-    // Scan for new devices
     property var btScanPollProc: Process {
         command: ["bash", "-c", `
             bluetoothctl devices | while read _ mac rest; do
@@ -140,7 +125,6 @@ QtObject {
                 if (parts.length !== 4) return
 
                 const mac = parts[0].trim()
-                // Toujours ajouter, on veut TOUS les devices visibles
                 const device = {
                     mac,
                     name: parts[1].trim(),
@@ -156,7 +140,6 @@ QtObject {
 
         onExited: {
             root.btScanning = false
-            // Dédupliquer par MAC si besoin
             const seen = {}
             root.btScanList = stdout.buf.filter(d => {
                 if (seen[d.mac]) return false

@@ -14,11 +14,6 @@ ColumnLayout {
 
     property var pageModel: []
 
-    property var _queue: []
-    property bool _writing: false
-
-    property int _bgPid: 0
-
     function updatePage() {
         pageModel = wallpapers.slice(wallPage * 9, wallPage * 9 + 9)
     }
@@ -89,23 +84,7 @@ ColumnLayout {
     function setWallpaper(path) {
         if (path === _activeWallPath) return
         _activeWallPath = path
-
-        _queue.push(path)
-        if (!_writing)
-            _writeNext()
-    }
-
-    function _writeNext() {
-        if (_queue.length === 0) {
-            _writing = false
-            return
-        }
-
-        _writing = true
-        const path = _queue.shift()
-
         _daemon.write(path + "\n")
-        _writeNext()
     }
 
     RowLayout {

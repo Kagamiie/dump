@@ -7,7 +7,6 @@ Item {
 
     Component.onCompleted: _loadApps.running = true
 
-    // Load desktop apps
     property var _loadApps: Process {
         command: ["bash", "-c",
             "IFS=: read -ra dirs <<< \"$XDG_DATA_DIRS\"; " +
@@ -35,25 +34,16 @@ Item {
         }
     }
 
-    // App filtering
     function updateFilter() {
         const q = root.query.toLowerCase()
         if (!q) {
-            root.filtered = root.apps.slice()
+            root.filtered = root.apps
             return
         }
 
-        const starts = []
-        const contains = []
-        for (const a of root.apps) {
-            const n = a.name.toLowerCase()
-            if (n.startsWith(q)) starts.push(a)
-            else if (n.includes(q)) contains.push(a)
-        }
-        root.filtered = starts.concat(contains)
+        root.filtered = root.apps.filter(a => a.name.toLowerCase().includes(q))
     }
 
-    // Nix search timer
     property var _nixTimer: Timer {
         interval: 500
         repeat: false
@@ -68,11 +58,10 @@ Item {
         Qt.callLater(() => nixProc.running = true)
     }
 
-    // Nix packages search
     property var _nixProc: Process {
         id: nixProc
         property string q: ""
-        command: ["nix", "search", "nixpkgs", q, "--json",
+        command: ["timeout", "10", "nix", "search", "nixpkgs", q, "--json",
                   "--extra-experimental-features", "nix-command flakes"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -99,7 +88,6 @@ Item {
         }
     }
 
-    // System operations
     property var _clipProc: Process { property string t: ""; command: ["wl-copy", "--", t] }
     property var _notifProc: Process { property string m: ""; command: ["notify-send", "-t", "2000", "nixpkgs", m] }
     property var _launchProc: Process { property string cmd: ""; command: ["sh", "-c", cmd + " &"] }
@@ -120,7 +108,6 @@ Item {
         root.visible = false
     }
 
-    // Signal handlers
     Connections {
         target: root
 

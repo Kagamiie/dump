@@ -12,30 +12,18 @@ QtObject {
     property bool   micMuted: false
     property string micLabel: "Microphone"
 
-    property int _subscribeRestartAttempts: 0
-    property int _maxSubscribeRestarts: 5
-
     // Subscribe to audio changes
     property var subscribeProc: Process {
         command: ["pactl", "subscribe"]
         running: true
+
         onRunningChanged: {
             if (!running) {
-                _subscribeRestartAttempts++
-
-                if (_subscribeRestartAttempts > _maxSubscribeRestarts) {
-                    console.error("AudioService: pactl subscribe failed too many times")
-                    return
-                }
-
-                const delay = Math.min(60000, 1000 * Math.pow(2, _subscribeRestartAttempts))
-                console.warn(`AudioService: pactl subscribe died, restarting (attempt ${_subscribeRestartAttempts}/${_maxSubscribeRestarts}) in ${delay}ms`)
-                _subscribeRestartTimer.interval = delay
-                _subscribeRestartTimer.start()
-            } else {
-                _subscribeRestartAttempts = 0
+                console.warn("AudioService: pactl subscribe died, restarting in 3s")
+                _subscribeRestartTimer.restart()
             }
         }
+
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: line => {
@@ -46,7 +34,8 @@ QtObject {
     }
 
     property var _subscribeRestartTimer: Timer {
-        interval: 2000; repeat: false
+        interval: 3000
+        repeat: false
         onTriggered: subscribeProc.running = true
     }
 

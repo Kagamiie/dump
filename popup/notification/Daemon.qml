@@ -21,39 +21,6 @@ PanelWindow {
 
     property Component toastComponent: Component { Toast {} }
 
-    // Cleanup de base
-    Timer {
-        interval: 60000; repeat: true; running: true
-        onTriggered: {
-            const keys = Object.keys(server.activeNotifs)
-            for (const k of keys) {
-                const obj = server.activeNotifs[k]
-                if (!obj || obj._dismissing) {
-                    delete server.activeNotifs[k]
-                    if (obj) {
-                        try { obj.destroy() } catch(e) {}
-                    }
-                }
-            }
-        }
-    }
-
-    // Limite de notifications
-    function _enforceMaxNotifications() {
-        const keys = Object.keys(server.activeNotifs)
-        if (keys.length > server.maxNotifications) {
-            // Supprimer les plus anciennes
-            const toDelete = keys.slice(0, keys.length - server.maxNotifications)
-            for (const k of toDelete) {
-                const obj = server.activeNotifs[k]
-                if (obj && !obj._dismissing) {
-                    delete server.activeNotifs[k]
-                    try { obj.destroy() } catch(e) {}
-                }
-            }
-        }
-    }
-
     Process {
         id: saveProc
         property string cmd: ""
@@ -130,7 +97,6 @@ PanelWindow {
     NotificationServer {
         id: server
         property var activeNotifs: ({})
-        readonly property int maxNotifications: 20
         actionsSupported: true
 
         onNotification: notif => {
@@ -154,7 +120,6 @@ PanelWindow {
 
             const existing = server.activeNotifs[key]
             if (existing && !existing._dismissing) {
-                // Stack: update la notification existante
                 existing.notifSummary = notif.summary ?? ""
                 existing.notifBody    = notif.body    ?? ""
                 existing.notifAppIcon = notif.appIcon ?? ""
@@ -168,7 +133,6 @@ PanelWindow {
                 return
             }
 
-            // Créer nouvelle notification
             const obj = root.toastComponent.createObject(notifCol, {
                 c:            root.c,
                 notifSummary: notif.summary  ?? "",
@@ -203,9 +167,6 @@ PanelWindow {
                     }
                 })
             })
-
-            // Enforce limite après création
-            root._enforceMaxNotifications()
         }
     }
 

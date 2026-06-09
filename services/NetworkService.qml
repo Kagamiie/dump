@@ -19,32 +19,17 @@ QtObject {
     signal connectionFailed(string ssid)
     signal connectionSuccess()
 
-    property var  _cmdQueue: []
-    property bool _cmdRunning: false
+    property var switchTimeout: Timer {
+        interval: 45000
+        repeat: false
 
-    function _runCommand(cmd, emitSignal, identifier) {
-        _cmdQueue.push({
-            cmd: cmd,
-            emitSignal: emitSignal,
-            identifier: identifier
-        })
-
-        _runNextCommand()
-    }
-
-    function _runNextCommand() {
-        if (_cmdRunning || _cmdQueue.length === 0)
-            return
-
-        const next = _cmdQueue.shift()
-
-        _cmdRunning = true
-
-        _cmdProc.cmd = next.cmd
-        _cmdProc.emitSignal = next.emitSignal
-        _cmdProc.identifier = next.identifier
-
-        _cmdProc.running = true
+        onTriggered: {
+            if (root.switching) {
+                console.error("NetworkService: switch timeout!")
+                root.switching = false
+                switchProc.running = false
+            }
+        }
     }
 
     function refresh() {
@@ -61,91 +46,71 @@ QtObject {
     }
 
     function connectKnown(profileName) {
-        _runCommand(
-            ["nmcli", "--wait", "0", "connection", "up", profileName],
-            true,
-            profileName
-        )
+        _cmdProc.emitSignal = true
+        _cmdProc.identifier = profileName
+        _cmdProc.cmd = ["nmcli", "--wait", "30", "connection", "up", profileName]
+        _cmdProc.running = true
     }
 
     function connectNew(ssid, pass) {
-        _runCommand(
-            ["nmcli", "--wait", "0", "dev", "wifi", "connect", ssid, "password", pass],
-            true,
-            ssid
-        )
+        _cmdProc.emitSignal = true
+        _cmdProc.identifier = ssid
+        _cmdProc.cmd = ["nmcli", "--wait", "30", "dev", "wifi", "connect", ssid, "password", pass]
+        _cmdProc.running = true
     }
 
     function deleteProfile(profileName) {
-        _runCommand(
-            ["nmcli", "--wait", "0", "connection", "delete", profileName],
-            false,
-            ""
-        )
-    }
-
-    property var switchWifiProc: Process {
-        property string cmd: ""
-
-        command: ["bash", "-c", cmd]
-
-        onExited: {
-            switching = false
-            refresh()
-            refreshWifiList()
-        }
-    }
-
-    property var switchEthProc: Process {
-        property string cmd: ""
-
-        command: ["bash", "-c", cmd]
-
-        onExited: {
-            switching = false
-            refresh()
-        }
+        _cmdProc.emitSignal = false
+        _cmdProc.cmd = ["nmcli", "--wait", "30", "connection", "delete", profileName]
+        _cmdProc.running = true
     }
 
     function switchToWifi() {
-        if (!wifiIface || !ethIface || switching)
-            return
-
+        if (!wifiIface || !ethIface || switching) return
         switching = true
+        switchTimeout.start()
 
-        switchWifiProc.running = false
-
-        switchWifiProc.cmd =
-            "nmcli --wait 0 device disconnect " + ethIface +
-            " 2>/dev/null; " +
-            "sleep 0.3; " +
-            "nmcli --wait 0 device connect " + wifiIface
-
-        switchWifiProc.running = true
+        switchProc.cmd =
+            "nmcli --wait 30 device disconnect " + ethIface + " && " +
+            "sleep 1 && " +
+            "nmcli --wait 30 device connect " + wifiIface
+        switchProc.running = true
     }
 
     function switchToEth() {
-        if (!wifiIface || !ethIface || switching)
-            return
-
+        if (!wifiIface || !ethIface || switching) return
         switching = true
+        switchTimeout.start()
 
-        switchEthProc.running = false
+        switchProc.cmd =
+            "nmcli --wait 30 device disconnect " + wifiIface + " && " +
+            "sleep 1 && " +
+            "nmcli --wait 30 device connect " + ethIface
+        switchProc.running = true
+    }
 
-        switchEthProc.cmd =
-            "nmcli --wait 0 device disconnect " + wifiIface +
-            " 2>/dev/null; " +
-            "sleep 0.3; " +
-            "nmcli --wait 0 device connect " + ethIface
+    property var switchProc: Process {
+        property string cmd: ""
+        command: ["sh", "-c", cmd]
 
-        switchEthProc.running = true
+        onExited: code => {
+            switchTimeout.stop()
+            switching = false
+
+            if (code !== 0) {
+                console.error("NetworkService: switch failed with code", code)
+                return
+            }
+
+            refresh()
+            refreshWifiList()
+        }
     }
 
     property var _init: Timer {
         interval: 0
         repeat: false
         running: true
-
         onTriggered: {
             ifaceProc.running = true
             savedProc.running = true
@@ -157,7 +122,6 @@ QtObject {
         interval: 30000
         repeat: true
         running: !_nmcliMonitor.running
-
         onTriggered: refresh()
     }
 
@@ -167,18 +131,11 @@ QtObject {
 
         stdout: SplitParser {
             splitMarker: "\n"
-
             onRead: line => {
-                if (!line.trim())
-                    return
-
-                if (switching)
-                    return
-
-                refresh()
-
+                if (!line.trim() || root.switching) return
+                root.refresh()
                 if (line.includes("wifi") || line.includes("wireless"))
-                    wifiListProc.running = true
+                    root.wifiListProc.running = true
             }
         }
 
@@ -191,7 +148,6 @@ QtObject {
     property var _monitorRestartTimer: Timer {
         interval: 3000
         repeat: false
-
         onTriggered: _nmcliMonitor.running = true
     }
 
@@ -248,9 +204,7 @@ QtObject {
 
             onRead: line => {
                 const idx = line.indexOf(":")
-
-                if (idx < 1)
-                    return
+                if (idx < 1) return
 
                 const ssid = line.substring(0, idx).trim()
                 const name = line.substring(idx + 1).trim()
@@ -280,7 +234,6 @@ QtObject {
 
             onRead: line => {
                 const iface = line.trim()
-
                 root.netName = iface || "No connection"
 
                 if (!iface) {
@@ -288,9 +241,7 @@ QtObject {
                     return
                 }
 
-                root.useWifi =
-                    iface === wifiIface ||
-                    iface.startsWith("wl")
+                root.useWifi = iface === root.wifiIface || iface.startsWith("wl")
             }
         }
     }
@@ -306,16 +257,13 @@ QtObject {
 
             onRead: line => {
                 const parts = line.split(":")
-
-                if (parts.length < 3)
-                    return
+                if (parts.length < 3) return
 
                 const ssid = parts[0].trim()
                 const signal = parseInt(parts[1]) || 0
                 const active = parts[2].trim() === "yes"
 
-                if (!ssid)
-                    return
+                if (!ssid) return
 
                 if (!buf[ssid] || signal > buf[ssid].signal)
                     buf[ssid] = { ssid, signal, active }
@@ -327,13 +275,11 @@ QtObject {
                 stdout.buf = ({})
             } else {
                 const arr = Object.values(stdout.buf)
-
                 arr.sort((a, b) =>
                     a.active ? -1 :
                     b.active ? 1 :
                     b.signal - a.signal
                 )
-
                 root.netList = arr
             }
         }
@@ -347,8 +293,6 @@ QtObject {
         command: cmd
 
         onExited: code => {
-            _cmdRunning = false
-
             savedProc.running = true
             netProc.running = true
 
@@ -358,8 +302,6 @@ QtObject {
                 else
                     root.connectionSuccess()
             }
-
-            Qt.callLater(() => _runNextCommand())
         }
     }
 }

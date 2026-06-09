@@ -35,28 +35,13 @@ Item {
 
     Component.onCompleted: _buildDateLabel()
 
-    // Timer minuit: recalculer l'intervalle chaque fois
     Timer {
-        id: _midnightTimer
-        repeat: false
+        id: _dailyTimer
+        interval: 86400000
+        repeat: true
         running: true
-
-        function recalculateInterval() {
-            const now = new Date()
-            const tomorrow = new Date(now)
-            tomorrow.setDate(tomorrow.getDate() + 1)
-            tomorrow.setHours(0, 0, 0, 0)
-            const delta = tomorrow - now
-            interval = Math.max(1000, delta + 500)  // Buffer de 500ms
-        }
-
-        Component.onCompleted: recalculateInterval()
-
-        onTriggered: {
-            _buildDateLabel()
-            recalculateInterval()
-            start()
-        }
+        triggeredOnStart: true
+        onTriggered: _buildDateLabel()
     }
 
     SystemClock { id: clk; precision: SystemClock.Seconds }

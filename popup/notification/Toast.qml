@@ -26,10 +26,8 @@ Item {
     function _dismiss() {
         if (_dismissing) return
         _dismissing = true
-
         progressAnim.stop()
         progressFill.width = 0
-
         dismissed()
     }
 
@@ -58,7 +56,15 @@ Item {
         }
     }
 
-    on_HoveredChanged: _hovered ? progressAnim.pause() : progressAnim.resume()
+    on_HoveredChanged: {
+        if (_hovered) {
+            progressAnim.pause()
+        } else {
+            if (!_dismissing) {
+                progressAnim.resume()
+            }
+        }
+    }
 
     MouseArea {
         anchors.fill: parent
