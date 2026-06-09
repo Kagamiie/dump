@@ -19,7 +19,6 @@ PanelWindow {
 
     readonly property int tabOverview:   0
     readonly property int tabWallpaper:  1
-    readonly property int tabSchedule:   2
 
     function toggle()  { visible = !visible }
     function show()    { visible = true }

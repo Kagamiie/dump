@@ -11,13 +11,12 @@ Item {
     implicitHeight: parent.height
     implicitWidth: row.implicitWidth
 
-    property bool   hoveredDateTime: false
-    property bool   hoveredWeather:  false
-    property string weatherIcon:     WeatherService.icon
-    property string weatherTemp:     WeatherService.tempC
-    property string _dateLabel:      ""
+    property bool hoveredDateTime: false
+    property bool hoveredWeather: false
+    property string weatherIcon: WeatherService.icon
+    property string weatherTemp: WeatherService.tempC
+    property string _dateLabel: ""
 
-    // Build date string once, then use function
     function _buildDateLabel() {
         const d = new Date()
         const months = ["January","February","March","April","May","June",
@@ -36,22 +35,27 @@ Item {
 
     Component.onCompleted: _buildDateLabel()
 
-    // Midnight timer - reset date at midnight
+    // Timer minuit: recalculer l'intervalle chaque fois
     Timer {
         id: _midnightTimer
-        interval: {
-            const now = new Date()
-            const midnight = new Date(now)
-            midnight.setDate(midnight.getDate() + 1)
-            midnight.setHours(0, 0, 0, 0)
-            return midnight - now
-        }
         repeat: false
         running: true
+
+        function recalculateInterval() {
+            const now = new Date()
+            const tomorrow = new Date(now)
+            tomorrow.setDate(tomorrow.getDate() + 1)
+            tomorrow.setHours(0, 0, 0, 0)
+            const delta = tomorrow - now
+            interval = Math.max(1000, delta + 500)  // Buffer de 500ms
+        }
+
+        Component.onCompleted: recalculateInterval()
+
         onTriggered: {
-            clockRoot._buildDateLabel()
-            interval = 86400000
-            repeat = true
+            _buildDateLabel()
+            recalculateInterval()
+            start()
         }
     }
 
@@ -72,7 +76,6 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
 
-        // Date/Time display
         Row {
             id: dateTimeRow
             anchors.verticalCenter: parent.verticalCenter
@@ -101,7 +104,6 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        // Weather display
         Row {
             id: weatherRow
             anchors.verticalCenter: parent.verticalCenter

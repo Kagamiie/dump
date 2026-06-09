@@ -2,23 +2,32 @@ import QtQuick
 
 QtObject {
     function parseLine(line) {
-        if (!line.trim()) return null
-        const parts = line.split("\t")
-        if (parts.length < 10 || parts[2].trim() === "start_time") return null
+        if (!line || !line.trim()) return null
 
-        const rawTitle   = parts[9].trim().split(";")[0].trim()
-        const dashIdx    = rawTitle.indexOf(" - ")
-        const courseCode = dashIdx !== -1 ? rawTitle.substring(0, dashIdx).trim() : rawTitle
-        const courseName = dashIdx !== -1 ? rawTitle.substring(dashIdx + 3).trim() : ""
+        const parts = line.split("\t")
+        if (parts.length < 10) return null
+        if (parts[2].trim() === "start_time") return null
+
+        // Helper sécurisé
+        const safeTrim = (str) => (str && typeof str === 'string') ? str.trim() : ""
+        const safeExtract = (str, delimiter, idx) => {
+            const trimmed = safeTrim(str)
+            if (!trimmed) return ""
+            const split = trimmed.split(delimiter)
+            return safeTrim(split[idx] ?? "")
+        }
+
+        const courseCode = safeExtract(parts[0], null, 0) // juste trim
+        const courseName = safeExtract(parts[1], null, 0)
 
         return {
-            date:       parts[1].trim(),
-            start:      parts[2].trim(),
-            end:        parts[4].trim(),
-            courseCode,
-            courseName,
-            salle: parts.length > 10 ? parts[10].trim().split(" - ")[0].trim() : "",
-            prof:  parts.length > 11 ? parts[11].trim().split(";")[0].trim()   : ""
+            date:       safeTrim(parts[1]),
+            start:      safeTrim(parts[2]),
+            end:        safeTrim(parts[4]),
+            courseCode: courseCode,
+            courseName: courseName,
+            salle: parts.length > 10 ? safeExtract(parts[10], " - ", 0) : "",
+            prof:  parts.length > 11 ? safeExtract(parts[11], ";", 0) : ""
         }
     }
 }

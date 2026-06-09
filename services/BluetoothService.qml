@@ -40,7 +40,6 @@ QtObject {
     function scan() {
         btScanning = true
         btScanList = []
-        _scanCache = {}
         _runCommand(["bluetoothctl", "scan", "on"])
         btScanTimer.restart()
     }
@@ -141,8 +140,7 @@ QtObject {
                 if (parts.length !== 4) return
 
                 const mac = parts[0].trim()
-                if (_scanCache[mac]) return
-
+                // Toujours ajouter, on veut TOUS les devices visibles
                 const device = {
                     mac,
                     name: parts[1].trim(),
@@ -150,7 +148,6 @@ QtObject {
                     paired: parts[3] === "1"
                 }
 
-                _scanCache[mac] = device
                 buf.push(device)
             }
         }
@@ -159,7 +156,13 @@ QtObject {
 
         onExited: {
             root.btScanning = false
-            root.btScanList = stdout.buf.slice()
+            // Dédupliquer par MAC si besoin
+            const seen = {}
+            root.btScanList = stdout.buf.filter(d => {
+                if (seen[d.mac]) return false
+                seen[d.mac] = true
+                return true
+            })
             _runCommand(["bluetoothctl", "scan", "off"])
         }
     }

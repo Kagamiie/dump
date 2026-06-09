@@ -12,10 +12,8 @@ PanelWindow {
     required property bool dnd
 
     color: "transparent"
-
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-
     anchors { right: true; bottom: true }
 
     implicitWidth:  notifCol.implicitWidth  > 0 ? notifCol.implicitWidth  + 16 : 1
@@ -23,24 +21,34 @@ PanelWindow {
 
     property Component toastComponent: Component { Toast {} }
 
+    // Cleanup de base
     Timer {
         interval: 60000; repeat: true; running: true
         onTriggered: {
             const keys = Object.keys(server.activeNotifs)
             for (const k of keys) {
                 const obj = server.activeNotifs[k]
-                if (!obj) {
+                if (!obj || obj._dismissing) {
                     delete server.activeNotifs[k]
-                    continue
+                    if (obj) {
+                        try { obj.destroy() } catch(e) {}
+                    }
                 }
+            }
+        }
+    }
 
-                if (obj._dismissing) {
+    // Limite de notifications
+    function _enforceMaxNotifications() {
+        const keys = Object.keys(server.activeNotifs)
+        if (keys.length > server.maxNotifications) {
+            // Supprimer les plus anciennes
+            const toDelete = keys.slice(0, keys.length - server.maxNotifications)
+            for (const k of toDelete) {
+                const obj = server.activeNotifs[k]
+                if (obj && !obj._dismissing) {
                     delete server.activeNotifs[k]
-                    Qt.callLater(() => {
-                        try { obj.destroy() } catch(e) {
-                            console.warn("Daemon: GC destroy failed:", e)
-                        }
-                    })
+                    try { obj.destroy() } catch(e) {}
                 }
             }
         }
@@ -121,8 +129,9 @@ PanelWindow {
 
     NotificationServer {
         id: server
-        actionsSupported: true
         property var activeNotifs: ({})
+        readonly property int maxNotifications: 20
+        actionsSupported: true
 
         onNotification: notif => {
             if (root.dnd) {
@@ -145,6 +154,7 @@ PanelWindow {
 
             const existing = server.activeNotifs[key]
             if (existing && !existing._dismissing) {
+                // Stack: update la notification existante
                 existing.notifSummary = notif.summary ?? ""
                 existing.notifBody    = notif.body    ?? ""
                 existing.notifAppIcon = notif.appIcon ?? ""
@@ -158,6 +168,7 @@ PanelWindow {
                 return
             }
 
+            // Créer nouvelle notification
             const obj = root.toastComponent.createObject(notifCol, {
                 c:            root.c,
                 notifSummary: notif.summary  ?? "",
@@ -192,6 +203,9 @@ PanelWindow {
                     }
                 })
             })
+
+            // Enforce limite après création
+            root._enforceMaxNotifications()
         }
     }
 
